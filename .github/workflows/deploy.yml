@@ -25,10 +25,9 @@ jobs:
           cache: npm
       - run: npm ci
       - name: Build
-        env:
-          # base = /<repo-name>/ — works for project pages, no config needed
-          VITE_BASE: /${GITHUB_REPOSITORY#*/}
-        run: npm run build
+        # base = /<repo-name>/ — expanded by the SHELL here (env: blocks don't
+        # expand ${...} expressions, which is why this must live in run:)
+        run: VITE_BASE=/${GITHUB_REPOSITORY#*/} npm run build
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist
