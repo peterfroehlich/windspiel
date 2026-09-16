@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import { MATERIALS } from '../physics/materials'
 import { SCALES, scaleFrequencies } from '../physics/scales'
 import { lengthForFrequency, noteToFreq, TubeSpec, tubeFrequencies, tubeDecay } from '../physics/tubes'
+import { strikeWeights } from '../physics/modes'
 
 export interface TubeConfig {
   note: string
@@ -73,6 +74,34 @@ export function optimalDrop_mm(tubes: TubeConfig[]): number {
   if (!tubes.length) return 100
   const longest = Math.max(...tubes.map(t => t.length_mm))
   return Math.round(longest * 0.5)
+}
+
+/**
+ * Drop where all tubes sound MOSTLY EQUALLY LOUD.
+ *
+ * With one striker height, tube i is struck at ξᵢ = drop/Lᵢ — short tubes get
+ * hit near their bottom (weak fundamental, |φ₁| small near 0.78 node... actually
+ * ξ→1 is an END antinode, but m_eff(ξ) grows steeply toward the ends), long
+ * tubes near their center (strong fundamental). Sweep the drop and pick the
+ * position minimizing the spread of fundamental excitation |φ₁(ξᵢ)| across tubes.
+ */
+export function equalLoudnessDrop_mm(tubes: TubeConfig[], suspensionPoint: number): number {
+  if (tubes.length < 2) return 100
+  const Ls = tubes.map(t => t.length_mm / 1000)
+  const Lmin = Math.min(...Ls), Lmax = Math.max(...Ls)
+  let bestDrop = Lmax * 0.5
+  let bestSpread = Infinity
+  for (let frac = 0.15; frac <= 0.95; frac += 0.005) {
+    const drop = frac * Lmax
+    const exc = Ls.map(L => {
+      const xi = Math.max(0.02, Math.min(0.98, drop / L))
+      return strikeWeights(xi)[0]   // fundamental excitation 0..1
+    })
+    const mean = exc.reduce((a, b) => a + b, 0) / exc.length
+    const spread = Math.sqrt(exc.reduce((a, b) => a + (b - mean) ** 2, 0) / exc.length)
+    if (spread < bestSpread) { bestSpread = spread; bestDrop = drop }
+  }
+  return Math.round(bestDrop * 1000)
 }
 
 DEFAULT_CONFIG.strikerDrop_mm = optimalDrop_mm(computeTubes(DEFAULT_CONFIG))

@@ -1,7 +1,7 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useLayoutEffect } from 'react'
 import type { ChangeEvent } from 'react'
 import { createPortal } from 'react-dom'
-import { useStore, tubeSpec, maxDrop_mm, optimalDrop_mm, tubeGeometry } from '../state/store'
+import { useStore, tubeSpec, maxDrop_mm, optimalDrop_mm, equalLoudnessDrop_mm, tubeGeometry } from '../state/store'
 import { MATERIALS, STRIKER_MATERIALS } from '../physics/materials'
 import { SCALES, MOODS, NOTE_NAMES } from '../physics/scales'
 import { tubeDecay } from '../physics/tubes'
@@ -10,35 +10,65 @@ import { estimateStrike, strikerMass } from '../physics/radiation'
 import { audio } from '../audio/engine'
 import { HELP } from './help'
 import { PhysicsModal } from './PhysicsModal'
+import { DEFAULT_CONFIG } from '../state/store'
+
+/** Config keys accepted on import (subset check against foreign JSON). */
+const DEFAULT_CONFIG_KEYS = Object.keys(DEFAULT_CONFIG) as (keyof typeof DEFAULT_CONFIG)[]
 
 function Help({ id }: { id: keyof typeof HELP | string }) {
   const text = HELP[id]
   const [open, setOpen] = useState(false)
-  const [pos, setPos] = useState({ x: 0, y: 0 })
-  const ref = useRef<HTMLSpanElement>(null)
-  if (!text) return null
+  const [pos, setPos] = useState<{ x: number; y: number; below: boolean } | null>(null)
+  const badgeRef = useRef<HTMLSpanElement>(null)
+  const tipRef = useRef<HTMLSpanElement | null>(null)
+
   const show = () => {
-    const r = ref.current?.getBoundingClientRect()
-    if (r) setPos({ x: r.left + r.width / 2, y: r.top })
+    const r = badgeRef.current?.getBoundingClientRect()
+    if (!r) return
+    setPos({ x: r.left + r.width / 2, y: r.top, below: false })
     setOpen(true)
   }
+  const hide = () => setOpen(false)
+
+  // Clamp the portaled tooltip inside the viewport: flip below the badge when
+  // there is no room above, and keep it within horizontal margins.
+  useLayoutEffect(() => {
+    if (!open || !pos || !tipRef.current) return
+    const rect = tipRef.current.getBoundingClientRect()
+    let { x, y, below } = pos
+    if (!below && rect.top < 8) {
+      const badge = badgeRef.current?.getBoundingClientRect()
+      if (badge) {
+        below = true
+        y = badge.bottom
+      }
+    }
+    const half = rect.width / 2
+    const cx = Math.max(8 + half, Math.min(window.innerWidth - 8 - half, x))
+    if (cx !== x || below !== pos.below) {
+      setPos({ x: cx, y, below })
+    }
+  }, [open, pos])
+
+  if (!text) return null
   return (
     <>
       <span
-        ref={ref}
+        ref={badgeRef}
         className="help"
         tabIndex={0}
         aria-label={`Help: ${id}`}
         onMouseEnter={show}
-        onMouseLeave={() => setOpen(false)}
+        onMouseLeave={hide}
         onFocus={show}
-        onBlur={() => setOpen(false)}
+        onBlur={hide}
       >
         ?
       </span>
-      {open && createPortal(
+      {open && pos && createPortal(
         <span
-          className="help-tip"
+          ref={tipRef}
+          className={'help-tip' + (pos.below ? ' below' : '')}
           role="tooltip"
           style={{ left: pos.x, top: pos.y }}
         >
@@ -56,16 +86,20 @@ function Slider(props: {
   /** optional optimal-value marker (0..1 relative position on the track) */
   marker?: number
   markerLabel?: string
+  /** optional second marker (rendered amber) */
+  marker2?: number
+  marker2Label?: string
   helpId?: string
 }) {
-  const marker = props.marker !== undefined
-    ? Math.max(0, Math.min(1, (props.marker - props.min) / (props.max - props.min)))
-    : undefined
+  const rel = (v: number) => Math.max(0, Math.min(1, (v - props.min) / (props.max - props.min)))
+  const marker = props.marker !== undefined ? rel(props.marker) : undefined
+  const marker2 = props.marker2 !== undefined ? rel(props.marker2) : undefined
+  const hasMarker = marker !== undefined || marker2 !== undefined
   return (
     <div className="row slider">
       <span className="label">{props.label}</span>
       {props.helpId && <Help id={props.helpId} />}
-      {marker !== undefined && (
+      {hasMarker ? (
         <span className="track-wrap">
           <input
             type="range"
@@ -75,11 +109,16 @@ function Slider(props: {
             value={props.value}
             onChange={(e: ChangeEvent<HTMLInputElement>) => props.onChange(parseFloat(e.target.value))}
           />
-          <span className="track-marker" style={{ left: `calc(${(marker * 100).toFixed(2)}% - 1px)` }}
-            title={props.markerLabel} />
+          {marker !== undefined && (
+            <span className="track-marker" style={{ left: `calc(${(marker * 100).toFixed(2)}% - 1px)` }}
+              title={props.markerLabel} />
+          )}
+          {marker2 !== undefined && (
+            <span className="track-marker amber" style={{ left: `calc(${(marker2 * 100).toFixed(2)}% - 1px)` }}
+              title={props.marker2Label} />
+          )}
         </span>
-      )}
-      {!marker && (
+      ) : (
         <input
           type="range"
           min={props.min}
@@ -216,11 +255,41 @@ export function Controls() {
     a.click()
   }
 
+  const importInputRef = useRef<HTMLInputElement>(null)
+
+  function importSpec(file: File) {
+    const reader = new FileReader()
+    reader.onload = () => {
+      try {
+        const data = JSON.parse(String(reader.result))
+        if (!data?.config) throw new Error('missing config')
+        // accept only known config keys (defensive against foreign JSON)
+        const cfg = { ...DEFAULT_CONFIG_KEYS.reduce((o, k) => (o[k] = data.config[k], o), {} as Record<string, unknown>) }
+        // manualNotes array length sanity
+        if (!Array.isArray(cfg.manualNotes)) cfg.manualNotes = [...DEFAULT_CONFIG.manualNotes]
+        setConfig(cfg as never)
+      } catch (err) {
+        alert('Could not import: not a valid windspiel spec file.')
+      }
+    }
+    reader.readAsText(file)
+  }
+
   return (
     <div className="panel">
       <div className="panel-header">
         <button className="reset-btn" onClick={() => reset()} title="Reset all settings to default">
           ⟲ Reset
+        </button>
+        <button className="icon-btn" onClick={() => importInputRef.current?.click()}
+          title="Import spec (JSON)">
+          📥
+        </button>
+        <input ref={importInputRef} type="file" accept="application/json,.json"
+          style={{ display: 'none' }}
+          onChange={(e) => { const f = e.target.files?.[0]; if (f) importSpec(f); e.target.value = '' }} />
+        <button className="icon-btn" onClick={exportSpec} title="Export spec (JSON)">
+          📤
         </button>
         <button className="mute-btn" onClick={() => setWindOn(!windOn)}
           title={windOn ? 'Stop the wind' : 'Start the wind'}
@@ -356,7 +425,9 @@ export function Controls() {
             value={Math.min(config.strikerDrop_mm, maxDrop_mm(tubes))}
             onChange={(v) => setConfig({ strikerDrop_mm: v })}
             marker={optimalDrop_mm(tubes)}
-            markerLabel="◎ optimal center-strike (50% of longest tube)" />
+            markerLabel="◎ optimal center-strike (50% of longest tube)"
+            marker2={equalLoudnessDrop_mm(tubes, config.suspensionPoint)}
+            marker2Label="◎ drop where all tubes sound most equally loud" />
         </>
       )}
 
@@ -432,10 +503,6 @@ export function Controls() {
       )}
 
       {tab === 'tuning' && <AcousticsInfo tubeIndex={inspectTube} />}
-
-      <div className="footer">
-        <button className="btn" onClick={exportSpec}>⬇ Export spec</button>
-      </div>
     </div>
   )
 }

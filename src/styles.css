@@ -11,6 +11,12 @@ body { font-family: system-ui, sans-serif; color: #dfe3ea; }
 }
 
 .panel-header { display: flex; justify-content: flex-start; gap: 6px; align-items: center; margin-bottom: 8px; }
+.icon-btn {
+  padding: 4px 8px; font-size: 13px; line-height: 1; cursor: pointer;
+  background: #1a2130; color: #dfe3ea; border: 1px solid #2a3242;
+  border-radius: 6px;
+}
+.icon-btn:hover { background: #2c3a56; border-color: #4a608a; }
 .mute-btn {
   margin-left: auto; padding: 4px 10px; font-size: 13px; line-height: 1; cursor: pointer;
   background: #1a2130; color: #dfe3ea; border: 1px solid #2a3242;
@@ -36,9 +42,14 @@ body { font-family: system-ui, sans-serif; color: #dfe3ea; }
   box-shadow: 0 6px 24px rgba(0, 0, 0, 0.5);
   pointer-events: none;
 }
+.help-tip.below { transform: translate(-50%, 10px); }
 .help-tip::after {
   content: ''; position: absolute; top: 100%; left: 50%; transform: translateX(-50%);
   border: 6px solid transparent; border-top-color: #3a4a6a;
+}
+.help-tip.below::after {
+  top: auto; bottom: 100%;
+  border-top-color: transparent; border-bottom-color: #3a4a6a;
 }
 .reset-btn {
   padding: 4px 10px; font-size: 11px; cursor: pointer;
@@ -151,6 +162,10 @@ body { font-family: system-ui, sans-serif; color: #dfe3ea; }
   background: #7ddb91; border-radius: 1px;
   pointer-events: none;
   box-shadow: 0 0 4px rgba(125, 219, 145, 0.8);
+}
+.track-marker.amber {
+  background: #e8b45a;
+  box-shadow: 0 0 4px rgba(232, 180, 90, 0.8);
 }
 
 .btn {
