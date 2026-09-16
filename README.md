@@ -1,5 +1,7 @@
 # Windspiel — Wind Chime Design & Simulation
 
+**Live demo:** https://peterfroehlich.github.io/windspiel/
+
 Interactive 3D wind chime designer with real-time acoustics and wind physics.
 Built with React + Three.js (react-three-fiber) + Web Audio API + Zustand.
 
