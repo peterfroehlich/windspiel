@@ -156,6 +156,34 @@ function specOf(i: number) {
   return tubeSpec(config, tubes[i], i)
 }
 
+type SectionId = 'tubes' | 'tuning' | 'striker' | 'wind'
+
+/** Collapsible sidebar section. Multiple sections can be open at once and the
+ *  sidebar scrolls. Folded sections unmount (cheap) — all values are derived
+ *  from the store on reopen, so cross-section updates stay consistent. */
+function Section({ id, title, open, toggle, children }: {
+  id: SectionId; title: string
+  open: Record<SectionId, boolean>
+  toggle: (id: SectionId) => void
+  children: React.ReactNode
+}) {
+  const isOpen = open[id]
+  return (
+    <div className={'section' + (isOpen ? ' open' : '')}>
+      <button className="section-head" onClick={() => toggle(id)}
+        aria-expanded={isOpen} aria-controls={`section-${id}`}>
+        <span className="chevron">{isOpen ? '▾' : '▸'}</span>
+        <span className="section-title">{title}</span>
+      </button>
+      {isOpen && (
+        <div className="section-body" id={`section-${id}`}>
+          {children}
+        </div>
+      )}
+    </div>
+  )
+}
+
 function AcousticsInfo({ tubeIndex }: { tubeIndex?: number | null }) {
   const { config, tubes } = useStore()
   const opt = optimalStrikePoint()
@@ -208,35 +236,32 @@ function AcousticsInfo({ tubeIndex }: { tubeIndex?: number | null }) {
 }
 
 export function Controls() {
-  const { config, tubes, setConfig, setManualNote, setTubeOverride, reset, windOn, setWindOn } = useStore()
-  const [tab, setTab] = useState<'tubes' | 'striker' | 'wind' | 'tuning'>('tubes')
+  const { reset, windOn, setWindOn } = useStore()
   const [physicsOpen, setPhysicsOpen] = useState(false)
   const [muted, setMuted] = useState(false)
-  const [inspectTube, setInspectTube] = useState<number | null>(null)
-  // mood + root derived from current config (mood via the active scale)
-  const activeScale = SCALES.find((s) => s.id === config.scaleId) ?? SCALES[0]
-  const scaleMood = activeScale.mood
-  const rootNote = config.rootNote || activeScale.root
 
-  function preview(i: number) {
-    audio.init(); audio.resume()
-    const a = (i / config.tubeCount) * Math.PI * 2
-    const xi = Math.max(0.02, Math.min(0.98, (config.strikerDrop_mm / 1000) / (tubes[i].length_mm / 1000)))
-    const neighbours = config.coupling
-      ? tubes.filter((_, j) => j !== i).map((t, j2) => tubeSpec(config, t, j2 < i ? j2 : j2 + 1))
-      : []
-    audio.strike(specOf(i), 0.85, Math.cos(a) * 0.7, xi, config.suspensionPoint, neighbours)
-    useStore.getState().flash(i, 0.8)   // 3D wobble feedback, same as clicking the tube
-  }
+  const importInputRef = useRef<HTMLInputElement>(null)
 
-  function playScale() {
-    audio.init(); audio.resume()
-    tubes.forEach((_, i) => {
-      setTimeout(() => preview(i), i * 450)
-    })
+  function importSpec(file: File) {
+    const reader = new FileReader()
+    reader.onload = () => {
+      try {
+        const data = JSON.parse(String(reader.result))
+        if (!data?.config) throw new Error('missing config')
+        // accept only known config keys (defensive against foreign JSON)
+        const cfg = { ...DEFAULT_CONFIG_KEYS.reduce((o, k) => (o[k] = data.config[k], o), {} as Record<string, unknown>) }
+        // manualNotes array length sanity
+        if (!Array.isArray(cfg.manualNotes)) cfg.manualNotes = [...DEFAULT_CONFIG.manualNotes]
+        useStore.getState().setConfig(cfg as never)
+      } catch (err) {
+        alert('Could not import: not a valid windspiel spec file.')
+      }
+    }
+    reader.readAsText(file)
   }
 
   function exportSpec() {
+    const { config, tubes } = useStore.getState()
     const data = {
       exported: new Date().toISOString(),
       config,
@@ -255,254 +280,268 @@ export function Controls() {
     a.click()
   }
 
-  const importInputRef = useRef<HTMLInputElement>(null)
-
-  function importSpec(file: File) {
-    const reader = new FileReader()
-    reader.onload = () => {
-      try {
-        const data = JSON.parse(String(reader.result))
-        if (!data?.config) throw new Error('missing config')
-        // accept only known config keys (defensive against foreign JSON)
-        const cfg = { ...DEFAULT_CONFIG_KEYS.reduce((o, k) => (o[k] = data.config[k], o), {} as Record<string, unknown>) }
-        // manualNotes array length sanity
-        if (!Array.isArray(cfg.manualNotes)) cfg.manualNotes = [...DEFAULT_CONFIG.manualNotes]
-        setConfig(cfg as never)
-      } catch (err) {
-        alert('Could not import: not a valid windspiel spec file.')
-      }
-    }
-    reader.readAsText(file)
-  }
+  // default-open sections: Tubes + Wind; user can fold/unfold freely (multi-open)
+  const [open, setOpen] = useState<Record<SectionId, boolean>>({ tubes: true, striker: false, wind: true, tuning: false })
+  const toggle = (id: SectionId) => setOpen((o) => ({ ...o, [id]: !o[id] }))
 
   return (
-    <div className="panel">
+    <div className="sidebar">
       <div className="panel-header">
         <button className="reset-btn" onClick={() => reset()} title="Reset all settings to default">
           ⟲ Reset
         </button>
-        <button className="icon-btn" onClick={() => importInputRef.current?.click()}
-          title="Import spec (JSON)">
-          📥
-        </button>
+        <button className="icon-btn" onClick={() => importInputRef.current?.click()} title="Import spec (JSON)">📥</button>
         <input ref={importInputRef} type="file" accept="application/json,.json"
           style={{ display: 'none' }}
           onChange={(e) => { const f = e.target.files?.[0]; if (f) importSpec(f); e.target.value = '' }} />
-        <button className="icon-btn" onClick={exportSpec} title="Export spec (JSON)">
-          📤
-        </button>
+        <button className="icon-btn" onClick={exportSpec} title="Export spec (JSON)">📤</button>
         <button className="mute-btn" onClick={() => setWindOn(!windOn)}
-          title={windOn ? 'Stop the wind' : 'Start the wind'}
-          aria-label={windOn ? 'Stop the wind' : 'Start the wind'}>
+          title={windOn ? 'Stop the wind' : 'Start the wind'}>
           {windOn ? '🌬️' : '🚫'}
         </button>
         <button className="mute-btn" onClick={() => { const m = !muted; setMuted(m); audio.setMuted(m) }}
-          title={muted ? 'Unmute' : 'Mute'}
-          aria-label={muted ? 'Unmute' : 'Mute'}>
+          title={muted ? 'Unmute' : 'Mute'}>
           {muted ? '🔇' : '🔈'}
         </button>
-        <button className="physics-btn" onClick={() => setPhysicsOpen(true)}
-          title="How the simulation works — all the physics">
-          ⚛ Physics!
-        </button>
+        <button className="physics-btn" onClick={() => setPhysicsOpen(true)} title="All the physics">⚛</button>
       </div>
       {physicsOpen && <PhysicsModal onClose={() => setPhysicsOpen(false)} />}
-      <div className="tabs">
-        {(['tubes', 'striker', 'wind', 'tuning'] as const).map((t) => (
-          <button key={t} className={tab === t ? 'tab active' : 'tab'} onClick={() => setTab(t)}>
-            {t[0].toUpperCase() + t.slice(1)}
-          </button>
-        ))}
+
+      <div className="sections">
+        <Section id="tubes" title="Tubes" open={open} toggle={toggle}>
+          <TubesSection />
+        </Section>
+        <Section id="tuning" title="Tuning" open={open} toggle={toggle}>
+          <TuningSection />
+        </Section>
+        <Section id="striker" title="Striker" open={open} toggle={toggle}>
+          <StrikerSection />
+        </Section>
+        <Section id="wind" title="Wind" open={open} toggle={toggle}>
+          <WindSection />
+        </Section>
       </div>
-
-      {tab === 'tubes' && (
-        <>
-          <Slider label="Tubes" min={3} max={12} step={1} helpId="tubeCount"
-            value={config.tubeCount} onChange={(v) => setConfig({ tubeCount: v })} />
-          <Select label="Material" value={config.material} helpId="material"
-            options={Object.values(MATERIALS)}
-            onChange={(v) => setConfig({ material: v })} />
-          <Slider label="Outer Ø" min={10} max={50} step={0.5} fmt={(v) => v + ' mm'} helpId="outerDiameter"
-            value={config.outerDiameter_mm} onChange={(v) => setConfig({ outerDiameter_mm: v })} />
-          <div className="row slider">
-            <span className="label">Wall</span>
-            <Help id="wallThickness" />
-            <input type="range" min={0.3} max={5} step={0.1} value={config.wallThickness_mm}
-              disabled={config.solid}
-              onChange={(e) => setConfig({ wallThickness_mm: parseFloat(e.target.value) })} />
-            <span className="val">{config.solid ? 'solid' : config.wallThickness_mm.toFixed(1) + ' mm'}</span>
-          </div>
-          <label className="row check">
-            <input type="checkbox" checked={config.solid}
-              onChange={(e) => setConfig({ solid: e.target.checked })} />
-            <span className="label" style={{ width: 'auto' }}>Solid rod</span>
-            <Help id="solid" />
-          </label>
-          <Slider label="Susp. radius" min={30} max={120} step={1} fmt={(v) => v + ' mm'} helpId="suspensionRadius"
-            value={config.suspensionRadius_mm} onChange={(v) => setConfig({ suspensionRadius_mm: v })} />
-          <Slider label="Susp. point" min={0.1} max={0.5} step={0.001} fmt={(v) => (v * 100).toFixed(1) + '%'} helpId="suspensionPoint"
-            value={config.suspensionPoint} onChange={(v) => setConfig({ suspensionPoint: v })}
-            marker={0.224} markerLabel="◎ mode-1 node — maximum sustain" />
-          <label className="row check">
-            <input type="checkbox" checked={config.coupling}
-              onChange={(e) => setConfig({ coupling: e.target.checked })} />
-            <span className="label" style={{ width: 'auto' }}>Tube coupling</span>
-            <Help id="coupling" />
-          </label>
-          <label className="row check adv-toggle">
-            <input type="checkbox" checked={config.advanced}
-              onChange={(e) => setConfig({ advanced: e.target.checked })} />
-            <span className="label" style={{ width: 'auto' }}>⚙ Advanced per-tube</span>
-            <Help id="advanced" />
-          </label>
-          {config.advanced && (
-            <div className="adv-list">
-              {tubes.map((t, i) => {
-                const o = config.tubeOverrides[i] ?? {}
-                const g = tubeGeometry(config, i)
-                const overridden = o.material || o.outerDiameter_mm || o.wallThickness_mm
-                return (
-                  <div key={i} className={'adv-tube' + (overridden ? ' ovr' : '')}>
-                    <div className="adv-head">
-                      <button className="mini" onClick={() => preview(i)}>♪</button>
-                      <span className="adv-note">{t.note}</span>
-                      <span className="adv-len">{t.length_mm.toFixed(0)} mm</span>
-                      {overridden && (
-                        <button className="adv-reset" title="Reset this tube to global settings"
-                          onClick={() => setTubeOverride(i, { material: config.material, outerDiameter_mm: config.outerDiameter_mm, wallThickness_mm: config.wallThickness_mm })}>
-                          ⟲
-                        </button>
-                      )}
-                    </div>
-                    <div className="adv-row">
-                      <span className="adv-label">Mat</span>
-                      <select value={g.material}
-                        onChange={(e) => setTubeOverride(i, { material: e.target.value })}>
-                        {Object.values(MATERIALS).map((m) => (
-                          <option key={m.id} value={m.id}>{m.label}</option>
-                        ))}
-                      </select>
-                    </div>
-                    <div className="adv-row">
-                      <span className="adv-label">Ø</span>
-                      <input type="range" min={10} max={50} step={0.5}
-                        value={g.Do * 1000}
-                        onChange={(e) => setTubeOverride(i, { outerDiameter_mm: parseFloat(e.target.value) })} />
-                      <span className="adv-val">{(g.Do * 1000).toFixed(1)}</span>
-                    </div>
-                    <div className="adv-row">
-                      <span className="adv-label">Wall</span>
-                      <input type="range" min={0.3} max={5} step={0.1}
-                        value={Math.min(5, g.t === Infinity ? config.wallThickness_mm : g.t * 1000)}
-                        disabled={g.solid}
-                        onChange={(e) => setTubeOverride(i, { wallThickness_mm: parseFloat(e.target.value) })} />
-                      <span className="adv-val">{g.solid ? 'solid' : (g.t * 1000).toFixed(1)}</span>
-                    </div>
-                    <div className="adv-row">
-                      <span className="adv-label">Solid</span>
-                      <input type="checkbox" checked={g.solid}
-                        onChange={(e) => setTubeOverride(i, { solid: e.target.checked })} />
-                      <span className="adv-val" style={{ width: 'auto' }}>rod</span>
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          )}
-        </>
-      )}
-
-      {tab === 'striker' && (
-        <>
-          <Select label="Material" value={config.strikerMaterial} helpId="strikerMaterial"
-            options={Object.values(STRIKER_MATERIALS)}
-            onChange={(v) => setConfig({ strikerMaterial: v })} />
-          <Slider label="Striker Ø" min={25} max={100} step={1} fmt={(v) => v + ' mm'} helpId="strikerDiameter"
-            value={config.strikerDiameter_mm} onChange={(v) => setConfig({ strikerDiameter_mm: v })} />
-          <Slider label="Thickness" min={8} max={60} step={1} fmt={(v) => v + ' mm'} helpId="strikerHeight"
-            value={config.strikerHeight_mm} onChange={(v) => setConfig({ strikerHeight_mm: v })} />
-          <Slider label="Drop" min={20} max={maxDrop_mm(tubes)} step={1} fmt={(v) => v + ' mm'} helpId="strikerDrop"
-            value={Math.min(config.strikerDrop_mm, maxDrop_mm(tubes))}
-            onChange={(v) => setConfig({ strikerDrop_mm: v })}
-            marker={optimalDrop_mm(tubes)}
-            markerLabel="◎ optimal center-strike (50% of longest tube)"
-            marker2={equalLoudnessDrop_mm(tubes, config.suspensionPoint)}
-            marker2Label="◎ drop where all tubes sound most equally loud" />
-        </>
-      )}
-
-      {tab === 'wind' && (
-        <>
-          <Slider label="Wind" min={0} max={1} step={0.01} fmt={(v) => (v * 100).toFixed(0) + '%'} helpId="windStrength"
-            value={config.windStrength} onChange={(v) => setConfig({ windStrength: v })} />
-          <Slider label="Gusts" min={0.02} max={1} step={0.01} fmt={(v) => v.toFixed(2) + ' Hz'} helpId="gustFrequency"
-            value={config.gustFrequency} onChange={(v) => setConfig({ gustFrequency: v })} />
-          <Slider label="Sail mass" min={5} max={200} step={1} fmt={(v) => v + ' g'} helpId="sailMass"
-            value={config.sailMass_g} onChange={(v) => setConfig({ sailMass_g: v })} />
-          <Slider label="Volume" min={0} max={1} step={0.01} fmt={(v) => (v * 100).toFixed(0) + '%'} helpId="volume"
-            value={config.volume} onChange={(v) => { setConfig({ volume: v }); audio.setVolume(v) }} />
-        </>
-      )}
-
-      {tab === 'tuning' && (
-        <>
-          <Select label="Mode" value={config.tuningMode} helpId="tuningMode"
-            options={[{ id: 'scale', label: 'Scale preset' }, { id: 'manual', label: 'Manual notes' }]}
-            onChange={(v) => setConfig({ tuningMode: v as 'scale' | 'manual' })} />
-          {config.tuningMode === 'scale' && (
-            <>
-              <div className="row">
-                <span className="label">Mood</span>
-                <Help id="mood" />
-                <div className="mood-row">
-                  {MOODS.map((m) => (
-                    <button
-                      key={m.id}
-                      className={scaleMood === m.id ? 'mood active' : 'mood'}
-                      onClick={() => {
-                        // switch mood → jump to first scale of that mood
-                        const first = SCALES.find((s) => s.mood === m.id)
-                        if (first) setConfig({ scaleId: first.id })
-                      }}>
-                      {m.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <Select label="Scale" value={config.scaleId} helpId="scale"
-                options={SCALES.filter((s) => s.mood === scaleMood)}
-                onChange={(v) => setConfig({ scaleId: v })} />
-              <Select label="Root" value={rootNote} helpId="rootNote"
-                options={NOTE_NAMES.map((n) => ({ id: n, label: n }))}
-                onChange={(v) => setConfig({ rootNote: v })} />
-            </>
-          )}
-          <button className="btn" onClick={playScale}>▶ Play scale</button>
-          <div className="tube-list">
-            {tubes.map((t, i) => (
-              <div key={i} className="tube-row" tabIndex={0}
-                onMouseEnter={() => setInspectTube(i)}
-                onMouseLeave={() => setInspectTube(null)}
-                onFocus={() => setInspectTube(i)}
-                onBlur={() => setInspectTube(null)}
-                onClick={() => preview(i)}
-                title="Click to strike — hover to see this tube's strike analysis">
-                <button className="mini" onClick={(e) => { e.stopPropagation(); preview(i) }}>♪</button>
-                <span className="note">{t.note}</span>
-                <span className="freq">{t.freq.toFixed(1)} Hz</span>
-                <span className="len">{t.length_mm.toFixed(0)} mm</span>
-                {config.tuningMode === 'manual' && (
-                  <input className="note-input" value={config.manualNotes[i] ?? 'A4'}
-                    onClick={(e) => e.stopPropagation()}
-                    onChange={(e) => setManualNote(i, e.target.value)} />
-                )}
-              </div>
-            ))}
-          </div>
-        </>
-      )}
-
-      {tab === 'tuning' && <AcousticsInfo tubeIndex={inspectTube} />}
     </div>
   )
+}
+
+
+
+/* ───────────────────────── Sections ───────────────────────── */
+
+function TubesSection() {
+  const { config, tubes, setConfig, setTubeOverride } = useStore()
+  return (
+    <>
+      <Slider label="Tubes" min={3} max={12} step={1} helpId="tubeCount"
+        value={config.tubeCount} onChange={(v) => setConfig({ tubeCount: v })} />
+      <Select label="Material" value={config.material} helpId="material"
+        options={Object.values(MATERIALS)}
+        onChange={(v) => setConfig({ material: v })} />
+      <Slider label="Outer Ø" min={10} max={50} step={0.5} fmt={(v) => v + ' mm'} helpId="outerDiameter"
+        value={config.outerDiameter_mm} onChange={(v) => setConfig({ outerDiameter_mm: v })} />
+      <div className="row slider">
+        <span className="label">Wall</span>
+        <Help id="wallThickness" />
+        <input type="range" min={0.3} max={5} step={0.1} value={config.wallThickness_mm}
+          disabled={config.solid}
+          onChange={(e) => setConfig({ wallThickness_mm: parseFloat(e.target.value) })} />
+        <span className="val">{config.solid ? 'solid' : config.wallThickness_mm.toFixed(1) + ' mm'}</span>
+      </div>
+      <label className="row check">
+        <input type="checkbox" checked={config.solid}
+          onChange={(e) => setConfig({ solid: e.target.checked })} />
+        <span className="label" style={{ width: 'auto' }}>Solid rod</span>
+        <Help id="solid" />
+      </label>
+      <Slider label="Susp. radius" min={30} max={120} step={1} fmt={(v) => v + ' mm'} helpId="suspensionRadius"
+        value={config.suspensionRadius_mm} onChange={(v) => setConfig({ suspensionRadius_mm: v })} />
+      <Slider label="Susp. point" min={0.1} max={0.5} step={0.001} fmt={(v) => (v * 100).toFixed(1) + '%'} helpId="suspensionPoint"
+        value={config.suspensionPoint} onChange={(v) => setConfig({ suspensionPoint: v })}
+        marker={0.224} markerLabel="◎ mode-1 node — maximum sustain" />
+      <label className="row check">
+        <input type="checkbox" checked={config.coupling}
+          onChange={(e) => setConfig({ coupling: e.target.checked })} />
+        <span className="label" style={{ width: 'auto' }}>Tube coupling</span>
+        <Help id="coupling" />
+      </label>
+      <label className="row check adv-toggle">
+        <input type="checkbox" checked={config.advanced}
+          onChange={(e) => setConfig({ advanced: e.target.checked })} />
+        <span className="label" style={{ width: 'auto' }}>⚙ Advanced per-tube</span>
+        <Help id="advanced" />
+      </label>
+      {config.advanced && (
+        <div className="adv-list">
+          {tubes.map((t, i) => {
+            const o = config.tubeOverrides[i] ?? {}
+            const g = tubeGeometry(config, i)
+            const overridden = o.material || o.outerDiameter_mm || o.wallThickness_mm || o.solid !== undefined
+            return (
+              <div key={i} className={'adv-tube' + (overridden ? ' ovr' : '')}>
+                <div className="adv-head">
+                  <button className="mini" onClick={() => previewTube(i)}>♪</button>
+                  <span className="adv-note">{t.note}</span>
+                  <span className="adv-len">{t.length_mm.toFixed(0)} mm</span>
+                  {overridden && (
+                    <button className="adv-reset" title="Reset this tube to global settings"
+                      onClick={() => setTubeOverride(i, { material: config.material, outerDiameter_mm: config.outerDiameter_mm, wallThickness_mm: config.wallThickness_mm, solid: config.solid })}>
+                      ⟲
+                    </button>
+                  )}
+                </div>
+                <div className="adv-row">
+                  <span className="adv-label">Mat</span>
+                  <select value={g.material}
+                    onChange={(e) => setTubeOverride(i, { material: e.target.value })}>
+                    {Object.values(MATERIALS).map((m) => (
+                      <option key={m.id} value={m.id}>{m.label}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="adv-row">
+                  <span className="adv-label">Ø</span>
+                  <input type="range" min={10} max={50} step={0.5}
+                    value={g.Do * 1000}
+                    onChange={(e) => setTubeOverride(i, { outerDiameter_mm: parseFloat(e.target.value) })} />
+                  <span className="adv-val">{(g.Do * 1000).toFixed(1)}</span>
+                </div>
+                <div className="adv-row">
+                  <span className="adv-label">Wall</span>
+                  <input type="range" min={0.3} max={5} step={0.1}
+                    value={Math.min(5, g.t === Infinity ? config.wallThickness_mm : g.t * 1000)}
+                    disabled={g.solid}
+                    onChange={(e) => setTubeOverride(i, { wallThickness_mm: parseFloat(e.target.value) })} />
+                  <span className="adv-val">{g.solid ? 'solid' : (g.t * 1000).toFixed(1)}</span>
+                </div>
+                <div className="adv-row">
+                  <span className="adv-label">Solid</span>
+                  <input type="checkbox" checked={g.solid}
+                    onChange={(e) => setTubeOverride(i, { solid: e.target.checked })} />
+                  <span className="adv-val" style={{ width: 'auto' }}>rod</span>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </>
+  )
+}
+
+function TuningSection() {
+  const { config, tubes, setConfig, setManualNote } = useStore()
+  const activeScale = SCALES.find((s) => s.id === config.scaleId) ?? SCALES[0]
+  const scaleMood = activeScale.mood
+  const rootNote = config.rootNote || activeScale.root
+  const [inspectTube, setInspectTube] = useState<number | null>(null)
+  return (
+    <>
+      <Select label="Mode" value={config.tuningMode} helpId="tuningMode"
+        options={[{ id: 'scale', label: 'Scale preset' }, { id: 'manual', label: 'Manual notes' }]}
+        onChange={(v) => setConfig({ tuningMode: v as 'scale' | 'manual' })} />
+      {config.tuningMode === 'scale' && (
+        <>
+          <div className="row">
+            <span className="label">Mood</span>
+            <Help id="mood" />
+            <div className="mood-row">
+              {MOODS.map((m) => (
+                <button key={m.id}
+                  className={scaleMood === m.id ? 'mood active' : 'mood'}
+                  onClick={() => {
+                    const first = SCALES.find((s) => s.mood === m.id)
+                    if (first) setConfig({ scaleId: first.id })
+                  }}>
+                  {m.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <Select label="Scale" value={config.scaleId} helpId="scale"
+            options={SCALES.filter((s) => s.mood === scaleMood)}
+            onChange={(v) => setConfig({ scaleId: v })} />
+          <Select label="Root" value={rootNote} helpId="rootNote"
+            options={NOTE_NAMES.map((n) => ({ id: n, label: n }))}
+            onChange={(v) => setConfig({ rootNote: v })} />
+        </>
+      )}
+      <button className="btn" onClick={() => tubes.forEach((_, i) => setTimeout(() => previewTube(i), i * 450))}>
+        ▶ Play scale
+      </button>
+      <div className="tube-list">
+        {tubes.map((t, i) => (
+          <div key={i} className="tube-row" tabIndex={0}
+            onMouseEnter={() => setInspectTube(i)}
+            onMouseLeave={() => setInspectTube(null)}
+            onFocus={() => setInspectTube(i)}
+            onBlur={() => setInspectTube(null)}
+            onClick={() => previewTube(i)}
+            title="Click to strike — hover to see this tube's strike analysis">
+            <button className="mini" onClick={(e) => { e.stopPropagation(); previewTube(i) }}>♪</button>
+            <span className="note">{t.note}</span>
+            <span className="freq">{t.freq.toFixed(1)} Hz</span>
+            <span className="len">{t.length_mm.toFixed(0)} mm</span>
+            {config.tuningMode === 'manual' && (
+              <input className="note-input" value={config.manualNotes[i] ?? 'A4'}
+                onClick={(e) => e.stopPropagation()}
+                onChange={(e) => setManualNote(i, e.target.value)} />
+            )}
+          </div>
+        ))}
+      </div>
+      <AcousticsInfo tubeIndex={inspectTube} />
+    </>
+  )
+}
+
+function StrikerSection() {
+  const { config, tubes, setConfig } = useStore()
+  return (
+    <>
+      <Select label="Material" value={config.strikerMaterial} helpId="strikerMaterial"
+        options={Object.values(STRIKER_MATERIALS)}
+        onChange={(v) => setConfig({ strikerMaterial: v })} />
+      <Slider label="Striker Ø" min={25} max={100} step={1} fmt={(v) => v + ' mm'} helpId="strikerDiameter"
+        value={config.strikerDiameter_mm} onChange={(v) => setConfig({ strikerDiameter_mm: v })} />
+      <Slider label="Thickness" min={8} max={60} step={1} fmt={(v) => v + ' mm'} helpId="strikerHeight"
+        value={config.strikerHeight_mm} onChange={(v) => setConfig({ strikerHeight_mm: v })} />
+      <Slider label="Drop" min={20} max={maxDrop_mm(tubes)} step={1} fmt={(v) => v + ' mm'} helpId="strikerDrop"
+        value={Math.min(config.strikerDrop_mm, maxDrop_mm(tubes))}
+        onChange={(v) => setConfig({ strikerDrop_mm: v })}
+        marker={optimalDrop_mm(tubes)}
+        markerLabel="◎ optimal center-strike (50% of longest tube)"
+        marker2={equalLoudnessDrop_mm(tubes, config.suspensionPoint)}
+        marker2Label="◎ drop where all tubes sound most equally loud" />
+    </>
+  )
+}
+
+function WindSection() {
+  const { config, setConfig } = useStore()
+  return (
+    <>
+      <Slider label="Wind" min={0} max={1} step={0.01} fmt={(v) => (v * 100).toFixed(0) + '%'} helpId="windStrength"
+        value={config.windStrength} onChange={(v) => setConfig({ windStrength: v })} />
+      <Slider label="Gusts" min={0.02} max={1} step={0.01} fmt={(v) => v.toFixed(2) + ' Hz'} helpId="gustFrequency"
+        value={config.gustFrequency} onChange={(v) => setConfig({ gustFrequency: v })} />
+      <Slider label="Sail mass" min={5} max={200} step={1} fmt={(v) => v + ' g'} helpId="sailMass"
+        value={config.sailMass_g} onChange={(v) => setConfig({ sailMass_g: v })} />
+      <Slider label="Volume" min={0} max={1} step={0.01} fmt={(v) => (v * 100).toFixed(0) + '%'} helpId="volume"
+        value={config.volume} onChange={(v) => { setConfig({ volume: v }); audio.setVolume(v) }} />
+    </>
+  )
+}
+
+/** Strike a tube from the UI (used by tube list & advanced cards). */
+function previewTube(i: number) {
+  const { config, tubes } = useStore.getState()
+  audio.init(); audio.resume()
+  const a = (i / config.tubeCount) * Math.PI * 2
+  const xi = Math.max(0.02, Math.min(0.98, (config.strikerDrop_mm / 1000) / (tubes[i].length_mm / 1000)))
+  const neighbours = config.coupling
+    ? tubes.filter((_, j) => j !== i).map((t, j2) => tubeSpec(config, t, j2 < i ? j2 : j2 + 1))
+    : []
+  audio.strike(specOf(i), 0.85, Math.cos(a) * 0.7, xi, config.suspensionPoint, neighbours)
+  useStore.getState().flash(i, 0.8)
 }
