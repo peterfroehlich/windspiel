@@ -14,11 +14,11 @@ export const HELP: Record<string, string> = {
     'Density also determines how loud a strike is (heavier = slower response to the same impulse).',
 
   outerDiameter:
-    'Outer tube diameter. Counter-intuitively, pitch barely depends on it: for a ' +
-    'thin tube f₀ ∝ √(I/A) = √(R²/2) — the R cancels against the L² term being ' +
-    'independent of R. What diameter does: bigger = louder (more radiating surface), ' +
-    'longer sustain, and a fuller bass character. It also changes required length ' +
-    'slightly (wall-thickness ratio matters).',
+    'Outer tube diameter. f₀ ∝ √(I/A) ∝ R (at fixed wall ratio), so bigger ' +
+    'diameters ring higher at the same length — the app re-solves every tube ' +
+    'length when you change it, keeping the tuning. Diameter also drives loudness ' +
+    '(radiating surface ∝ R·L) and sustain; wider tubes need slightly longer ' +
+    'lengths for the same note (length ∝ √R).',
 
   wallThickness:
     'Wall thickness. To first order pitch is independent of it (thin-wall theory), ' +

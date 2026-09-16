@@ -48,8 +48,10 @@ export function PhysicsModal({ onClose }: { onClose: () => void }) {
             </p>
             <p>
               <b>Key consequences:</b> frequency scales with 1/L² — doubling length drops the
-              pitch one octave plus a fifth (×¼). Pitch is (nearly) independent of diameter —
-              √(I/A) ≈ √(R²/2) for thin walls, and the L² in the denominator is what you tune with.
+              pitch one octave plus a fifth (×¼). For the exact circular section
+              I/A = (R²+Rᵢ²)/4, so at fixed wall ratio f₀ ∝ R: bigger diameters ring
+              higher at the same length (and need longer tubes for the same note —
+              the app re-solves lengths automatically).
             </p>
             <p>
               The inverse problem — "which length sounds like C5?" — is what the app solves for
