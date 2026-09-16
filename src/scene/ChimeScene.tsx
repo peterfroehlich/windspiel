@@ -219,7 +219,7 @@ function Simulator() {
       Math.max(0.1, sailLen),
       config.sailMass_g
     )
-    if (useStore.getState().windOn) {
+    if (useStore.getState().windOn && useStore.getState().audioArmed) {
       windSim.update(dt, { strength: config.windStrength, gustFreq: config.gustFrequency })
     } else {
       // wind stopped: let the pendulums settle to rest instead of freezing
@@ -253,7 +253,8 @@ export function ChimeScene() {
   const { config, tubes } = useStore()
   return (
     <>
-      <color attach="background" args={['#0b0e14']} />
+      {/* no scene background: page CSS provides it, keeping the WebGL canvas
+          transparent so the "back" wind-line layer can pass behind the chime */}
       <fog attach="fog" args={['#0b0e14', 4, 12]} />
       <ambientLight intensity={0.3} />
       <directionalLight position={[3, 6, 4]} intensity={2} castShadow />

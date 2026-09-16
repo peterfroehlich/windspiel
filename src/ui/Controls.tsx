@@ -280,8 +280,8 @@ export function Controls() {
     a.click()
   }
 
-  // default-open sections: Tubes + Wind; user can fold/unfold freely (multi-open)
-  const [open, setOpen] = useState<Record<SectionId, boolean>>({ tubes: true, striker: false, wind: true, tuning: false })
+  // default: Tubes + Tuning open, Striker + Wind folded; multi-open, scrollable
+  const [open, setOpen] = useState<Record<SectionId, boolean>>({ tubes: true, striker: false, wind: false, tuning: true })
   const toggle = (id: SectionId) => setOpen((o) => ({ ...o, [id]: !o[id] }))
 
   return (
@@ -513,6 +513,10 @@ function StrikerSection() {
         markerLabel="◎ optimal center-strike (50% of longest tube)"
         marker2={equalLoudnessDrop_mm(tubes, config.suspensionPoint)}
         marker2Label="◎ drop where all tubes sound most equally loud" />
+      <div className="marker-legend">
+        <span className="legend-item"><i className="dot green" /> best tone (center-strike)</span>
+        <span className="legend-item"><i className="dot amber" /> equal loudness</span>
+      </div>
     </>
   )
 }

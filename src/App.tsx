@@ -11,7 +11,13 @@ export default function App() {
   // first click/keypress so wind-driven strikes are audible afterwards.
   // On init, apply the configured volume (engine default is hardcoded).
   useEffect(() => {
-    const arm = () => { audio.init(); audio.setVolume(useStore.getState().config.volume); audio.resume() }
+    const arm = () => {
+      audio.init()
+      audio.setVolume(useStore.getState().config.volume)
+      audio.resume()
+      // wind (and its strikes) only makes sense once audio can actually play
+      useStore.getState().setAudioArmed(true)
+    }
     window.addEventListener('pointerdown', arm)
     window.addEventListener('keydown', arm)
     return () => {
@@ -22,10 +28,11 @@ export default function App() {
 
   return (
     <div className="app">
-      <Canvas shadows camera={{ position: [1.4, 1.5, 2.2], fov: 45 }}>
+      <WindLines layer="back" />
+      <Canvas shadows gl={{ alpha: true, antialias: true }} camera={{ position: [1.4, 1.5, 2.2], fov: 45 }}>
         <ChimeScene />
       </Canvas>
-      <WindLines />
+      <WindLines layer="front" />
       <Controls />
     </div>
   )

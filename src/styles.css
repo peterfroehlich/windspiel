@@ -195,6 +195,16 @@ body { font-family: system-ui, sans-serif; color: #dfe3ea; }
   box-shadow: 0 0 4px rgba(232, 180, 90, 0.8);
 }
 
+/* marker legend under the Drop slider */
+.marker-legend {
+  display: flex; gap: 14px; margin: 2px 0 4px; padding-left: 100px;
+  font-size: 10px; color: #6a7488;
+}
+.legend-item { display: inline-flex; align-items: center; gap: 5px; }
+.legend-item .dot { display: inline-block; width: 7px; height: 9px; border-radius: 2px; }
+.legend-item .dot.green { background: #7ddb91; box-shadow: 0 0 3px rgba(125, 219, 145, 0.7); }
+.legend-item .dot.amber { background: #e8b45a; box-shadow: 0 0 3px rgba(232, 180, 90, 0.7); }
+
 .btn {
   width: 100%; padding: 7px; margin: 8px 0 4px; cursor: pointer;
   background: #2c3a56; color: #fff; border: 1px solid #4a608a;

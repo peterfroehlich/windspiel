@@ -3,37 +3,44 @@ import { useStore } from '../state/store'
 import { windSim } from '../scene/ChimeScene'
 
 /**
- * Flowing wind lines streaming across the viewport (canvas overlay).
- *  - Flow is MOSTLY HORIZONTAL (left → right) with a slight vertical lean
- *    from the live wind vector of the simulation.
- *  - Streams OCCASIONALLY DO A LOOP: for ~1s the heading rotates through a
- *    full circle at constant turn rate, so the trail draws a loop-de-loop
- *    (comic wind curl), then the line continues on its way.
- *  - Streams spawn fully formed (trail pre-extended up-flow), live until the
- *    whole trail exits the viewport, and fade slowly with wind strength.
+ * Flowing wind lines streaming horizontally across the viewport (canvas
+ * overlay, comic-style with occasional loops).
+ *
+ * Two layers: a "back" canvas BELOW the WebGL canvas (lines pass behind the
+ * chime) and a "front" canvas ABOVE it (lines pass in front). Front lines are
+ * fewer and fainter so the chime stays the star. Flow is mostly horizontal
+ * with a slight lean from the live wind vector; streams occasionally do a
+ * full loop. Opacity is driven by wind strength × gust envelope, eased
+ * slowly. No expiry timer — streams live until their whole trail exits.
  */
 
 interface Pt { x: number; y: number }
 interface Stream {
-  pts: Pt[]          // trail points, head first
-  speed: number      // per-stream multiplier
+  pts: Pt[]
+  speed: number
   width: number
   hue: number
-  seed: number       // sway phase
-  alpha: number      // current eased opacity
-  dirX: number       // current heading (unit vector)
+  seed: number
+  alpha: number
+  dirX: number
   dirY: number
-  loopLeft: number   // seconds remaining in a loop (0 = not looping)
-  loopDur: number    // total loop duration
-  loopOmega: number  // turn rate during loop, rad/s (signed)
-  nextLoop: number   // countdown until the next loop
+  loopLeft: number
+  loopDur: number
+  loopOmega: number
+  nextLoop: number
 }
 
-const MAX_STREAMS = 26
+type Layer = 'back' | 'front'
 
-export function WindLines() {
+const LAYER_CFG: Record<Layer, { count: number; alpha: number; z: number; widthMul: number }> = {
+  back:  { count: 12, alpha: 0.5,  z: 1, widthMul: 1.0 },
+  front: { count: 5,  alpha: 0.32, z: 3, widthMul: 0.9 },
+}
+
+export function WindLines({ layer = 'front' }: { layer?: Layer }) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const streams = useRef<Stream[]>([])
+  const cfg = LAYER_CFG[layer]
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -55,16 +62,15 @@ export function WindLines() {
     resize()
     window.addEventListener('resize', resize)
 
-    /** Current base heading: mostly HORIZONTAL (left → right), with a slight
-     *  vertical lean from the live wind vector. */
+    /** Base heading: horizontal with a slight lean from the wind vector. */
     const baseDir = (): [number, number] => {
-      const wz = windSim.state.windZ
-      const lean = Math.max(-1, Math.min(1, wz / 3.5)) * 0.45
+      const leanW = windSim.state.windZ
+      const lean = Math.max(-1, Math.min(1, leanW / 3.5)) * 0.45
       const l = Math.hypot(1, lean)
       return [1 / l, lean / l]
     }
 
-    /** Build a fully-formed stream with its trail pre-extended UP-flow. */
+    /** Fully formed stream: trail pre-extended up-flow behind the head. */
     const make = (x: number, y: number): Stream => {
       const rand = Math.random
       const [dx, dy] = baseDir()
@@ -89,14 +95,13 @@ export function WindLines() {
       }
     }
 
-    /** Respawn helper: enter from the left edge (flow is left → right). */
     const respawn = (s: Stream) => {
       const r = Math.random()
       const m = 40
       let x: number, y: number
-      if (r < 0.7) { x = -m; y = Math.random() * H }               // left
-      else if (r < 0.85) { x = Math.random() * W; y = -m }         // top
-      else { x = Math.random() * W; y = H + m }                    // bottom
+      if (r < 0.7) { x = -m; y = Math.random() * H }
+      else if (r < 0.85) { x = Math.random() * W; y = -m }
+      else { x = Math.random() * W; y = H + m }
       const ns = make(x, y)
       s.pts = ns.pts
       s.speed = ns.speed
@@ -113,15 +118,14 @@ export function WindLines() {
       last = now
 
       const st = useStore.getState()
-      const windOn = st.windOn
+      const windOn = st.windOn && st.audioArmed && st.config.windStrength > 0.02
       const strength = st.config.windStrength
       const gust = windSim.state.gust
       const vis = windOn ? Math.min(1, strength * (0.35 + 0.65 * gust)) : 0
 
       ctx.clearRect(0, 0, W, H)
 
-      // maintain pool
-      const targetCount = Math.round(MAX_STREAMS * vis)
+      const targetCount = Math.round(cfg.count * vis)
       while (streams.current.length < targetCount) {
         const r = Math.random()
         const m = 40
@@ -141,16 +145,13 @@ export function WindLines() {
         )
       }
 
-      // forward speed: wind-driven, gentle drift when calm
       const v = (30 + 450 * vis) * dt
 
       ctx.lineCap = 'round'
       ctx.lineJoin = 'round'
 
       for (const s of streams.current) {
-        // --- heading: mostly vertical; loops rotate it through a circle ---
         if (s.loopLeft > 0) {
-          // rotate heading by omega*dt (full circle over loopDur → clean loop)
           const ang = s.loopOmega * dt
           const cos = Math.cos(ang), sin = Math.sin(ang)
           const ndx = s.dirX * cos - s.dirY * sin
@@ -158,14 +159,12 @@ export function WindLines() {
           s.dirX = ndx; s.dirY = ndy
           s.loopLeft -= dt
         } else {
-          // ease back toward the vertical base heading
           const [bx, by] = baseDir()
           const k = Math.min(1, dt * 1.5)
           s.dirX += (bx - s.dirX) * k
           s.dirY += (by - s.dirY) * k
           const l = Math.hypot(s.dirX, s.dirY) || 1
           s.dirX /= l; s.dirY /= l
-          // sometimes start a loop (only when the wind is actually blowing)
           s.nextLoop -= dt
           if (s.nextLoop <= 0 && vis > 0.15) {
             s.loopLeft = s.loopDur
@@ -173,19 +172,16 @@ export function WindLines() {
           }
         }
 
-        // move head along heading with gentle perpendicular sway
         const head = s.pts[0]
         const sway = Math.sin(now / 1000 * 1.6 + s.seed) * 14 * dt
         head.x += (s.dirX * v * s.speed / 100) + sway * -s.dirY
         head.y += (s.dirY * v * s.speed / 100) + sway * s.dirX
-        // trail follows: each point eases toward the one ahead
         for (let i = 1; i < s.pts.length; i++) {
           const p = s.pts[i], q = s.pts[i - 1]
           p.x += (q.x - p.x) * Math.min(1, dt * 9)
           p.y += (q.y - p.y) * Math.min(1, dt * 9)
         }
 
-        // recycle ONLY when the whole trail has left the view
         const tail = s.pts[s.pts.length - 1]
         const gone = tail.x < -240 || tail.x > W + 240 || tail.y < -240 || tail.y > H + 240
         if (gone) {
@@ -193,12 +189,12 @@ export function WindLines() {
           continue
         }
 
-        // opacity eases SLOWLY toward the wind-driven target
-        const target = 0.45 * (0.35 + 0.65 * vis)
+        // brighter than before: floor raised (0.55 vs 0.35) + stronger gust
+        // response so the default setting reads clearly
+        const target = cfg.alpha * (0.55 + 0.45 * vis)
         s.alpha += (target - s.alpha) * Math.min(1, dt * 0.8)
-        if (s.alpha < 0.01) continue
+        if (s.alpha < 0.012) continue
 
-        // smooth quadratic chain through midpoints
         ctx.beginPath()
         ctx.moveTo(s.pts[0].x, s.pts[0].y)
         for (let i = 1; i < s.pts.length - 1; i++) {
@@ -207,7 +203,7 @@ export function WindLines() {
           ctx.quadraticCurveTo(s.pts[i].x, s.pts[i].y, mx, my)
         }
         ctx.strokeStyle = `hsla(${s.hue}, 45%, ${72 + 18 * vis}%, ${s.alpha})`
-        ctx.lineWidth = s.width * (0.7 + 0.6 * vis)
+        ctx.lineWidth = s.width * cfg.widthMul * (0.7 + 0.6 * vis)
         ctx.stroke()
       }
     }
@@ -217,14 +213,14 @@ export function WindLines() {
       cancelAnimationFrame(raf)
       window.removeEventListener('resize', resize)
     }
-  }, [])
+  }, [layer, cfg])
 
   return (
     <canvas
       ref={canvasRef}
       style={{
         position: 'fixed', inset: 0, pointerEvents: 'none',
-        zIndex: 5, opacity: 0.9, mixBlendMode: 'screen',
+        zIndex: cfg.z, opacity: 0.92, mixBlendMode: 'screen',
       }}
     />
   )

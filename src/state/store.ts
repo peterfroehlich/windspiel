@@ -152,7 +152,9 @@ interface State {
   tubes: TubeConfig[]
   strikeFlash: Record<number, { t: number; vel: number }>   // tube index -> last strike (time + velocity)
   windOn: boolean                        // wind pause/play (transient, not a design default)
+  audioArmed: boolean                    // AudioContext created (first user gesture)
   setWindOn: (on: boolean) => void
+  setAudioArmed: (on: boolean) => void
   setConfig: (p: Partial<ChimeConfig>) => void
   setManualNote: (i: number, note: string) => void
   setTubeOverride: (i: number, o: TubeOverride) => void
@@ -174,7 +176,9 @@ export const useStore = create<State>((set) => ({
   tubes: computeTubes(DEFAULT_CONFIG),
   strikeFlash: {},
   windOn: true,
+  audioArmed: false,
   setWindOn: (on) => set({ windOn: on }),
+  setAudioArmed: (on) => set({ audioArmed: on }),
   setConfig: (p) => set(s => {
     const config = { ...s.config, ...p }
     const tubes = computeTubes(config)
