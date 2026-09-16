@@ -112,16 +112,39 @@ export function PhysicsModal({ onClose }: { onClose: () => void }) {
             <p>
               Each strike is a Hertzian contact impulse. The chain the app evaluates:
             </p>
-            <Eq>J = (1+e) · m<sub>striker</sub> · v&emsp;→&emsp;v<sub>point</sub> = J / m<sub>eff</sub>(ξ)</Eq>
+            <Eq>J = μ·(1+e) · v&emsp;→&emsp;v<sub>point</sub> = J / m<sub>eff</sub>(ξ)</Eq>
             <p>
-              with restitution e from striker hardness (rubber 0.17 … metal 0.55) and the mode's
-              effective mass m<sub>eff</sub>(ξ) = M·∫φ₁²dξ / φ₁(ξ)². Radiated power:
+              with the REDUCED MASS μ = m<sub>s</sub>·m<sub>eff</sub>/(m<sub>s</sub>+m<sub>eff</sub>) —
+              the tube gives way during impact, so the fixed-target approximation J = m<sub>s</sub>(1+e)v
+              would overestimate the impulse by ~1.5× for a hardwood striker on aluminum.
+              Restitution e comes from striker hardness (rubber 0.17 … metal 0.55). Radiated power:
             </p>
             <Eq>P = σ<sub>rad</sub> · ρ<sub>air</sub> · c<sub>air</sub> · S · u²<sub>rms</sub>&emsp;→&emsp;L<sub>p</sub> = 10·log₁₀(P/1e-12) − 8 dB</Eq>
             <p>
               with radiation efficiency σ_rad ≈ 0.03 (slender cylinder, below coincidence) and
               S the tube surface. A typical strike lands at 83–97 dB SPL @1 m — matching
               measurements of real chimes. The audio engine maps velocity → gain through this chain.
+            </p>
+          </Section>
+
+          <Section title="5b. Contact mechanics — striker form & material">
+            <p>
+              The contact itself lasts τ = 2.87·(m² / (R<sub>eff</sub>·E*²·v))^(1/5) seconds
+              (Hertz), with E* = 1/(0.91/E₁ + 0.91/E₂) and the combined curvature
+              1/R<sub>eff</sub> = 1/R<sub>striker</sub> + 1/R<sub>tube</sub>. This contact
+              pulse is a natural low-pass at f<sub>c</sub> ≈ 0.35/τ: soft rubber (E = 50 MPa)
+              gives τ ≈ 2 ms → f<sub>c</sub> ≈ 175 Hz → a warm "tup" with the upper partials
+              filtered out; hardwood ≈ 0.2 ms → partials up to ~1.8 kHz fully excited;
+              a sharp cylinder rim rolls the inharmonic 2.756×/5.404× partials down and
+              brightens the attack — the metallic "clank".
+            </p>
+            <p>
+              <b>Optimal striker weight</b> is an impedance-matching problem: too light bounces
+              off without transferring energy (μ → m<sub>s</sub> ≪ m<sub>eff</sub>), too heavy
+              can't be pumped by the sail (a = F/m → static lean, no impact velocity). The
+              balance point is m<sub>s</sub> ≈ m<sub>eff</sub>(0.5) of the longest tube
+              (≈ 90 g for the default aluminum chime). The Striker section shows this as
+              "◎ optimal".
             </p>
           </Section>
 

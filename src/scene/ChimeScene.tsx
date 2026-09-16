@@ -6,6 +6,8 @@ import { useStore, tubeSpec, tubeGeometry } from '../state/store'
 import { MATERIALS, STRIKER_MATERIALS } from '../physics/materials'
 import { WindSim } from '../physics/wind'
 import { audio } from '../audio/engine'
+import { partialExcitation } from '../physics/contact'
+import { tubeFrequencies } from '../physics/tubes'
 
 export const windSim = new WindSim()
 
@@ -112,14 +114,57 @@ function Striker() {
   })
 
   const y = -(config.strikerDrop_mm / 1000)
+  // striker geometry follows the selected contact form
+  const R = config.strikerDiameter_mm / 2000
+  const h = config.strikerHeight_mm / 1000
+  const strikeMat = (
+    <meshStandardMaterial color={mat.color} roughness={mat.roughness} metalness={config.strikerMaterial === 'metal' ? 0.9 : 0.05} />
+  )
+  let strikerMesh: React.ReactNode
+  switch (config.strikerForm) {
+    case 'sphere':   // ball
+      strikerMesh = (
+        <mesh castShadow>
+          <sphereGeometry args={[R, 32, 16]} />
+          {strikeMat}
+        </mesh>
+      )
+      break
+    case 'donut':    // torus ring
+      strikerMesh = (
+        <mesh castShadow rotation={[Math.PI / 2, 0, 0]}>
+          <torusGeometry args={[R * 0.72, Math.max(0.006, R * 0.28), 16, 40]} />
+          {strikeMat}
+        </mesh>
+      )
+      break
+    case 'cylinder': // body + rim ring (visual edge emphasis)
+      strikerMesh = (
+        <group>
+          <mesh castShadow>
+            <cylinderGeometry args={[R, R, h, 32]} />
+            {strikeMat}
+          </mesh>
+          <mesh castShadow position={[0, h / 2, 0]}>
+            <torusGeometry args={[R * 0.98, R * 0.05, 8, 40]} />
+            {strikeMat}
+          </mesh>
+        </group>
+      )
+      break
+    default:         // disc (flat face)
+      strikerMesh = (
+        <mesh castShadow>
+          <cylinderGeometry args={[R, R, h, 32]} />
+          {strikeMat}
+        </mesh>
+      )
+  }
   return (
     <>
       <primitive object={hangLine} />
       <group ref={ref} position={[0, y, 0]}>
-        <mesh castShadow>
-          <cylinderGeometry args={[config.strikerDiameter_mm / 2000, config.strikerDiameter_mm / 2000, config.strikerHeight_mm / 1000, 32]} />
-          <meshStandardMaterial color={mat.color} roughness={mat.roughness} metalness={config.strikerMaterial === 'metal' ? 0.9 : 0.05} />
-        </mesh>
+        {strikerMesh}
       </group>
     </>
   )
@@ -241,7 +286,16 @@ function Simulator() {
       const neighbours = config.coupling
         ? tubes.filter((_, j) => j !== tube).map((t, j2) => tubeSpec(config, t, j2 < tube ? j2 : j2 + 1))
         : []
-      audio.strike(spec, vel, pan, xi, config.suspensionPoint, neighbours)
+      // Hertzian contact: partial excitation through the contact-time low-pass
+      const striker = {
+        material: config.strikerMaterial, form: config.strikerForm,
+        diameter_mm: config.strikerDiameter_mm, height_mm: config.strikerHeight_mm,
+      }
+      const vImp = Math.max(0.02, vel * 0.15)   // normalized vel → m/s (sim regime)
+      const f0 = tubeFrequencies(spec).f0
+      const partials = [1, 2.756, 5.404, 8.933].map((r) =>
+        partialExcitation(r * f0, striker, spec, vImp, xi))
+      audio.strike(spec, vel, pan, xi, config.suspensionPoint, neighbours, { partials })
       useStore.getState().flash(tube, vel)
     }
   }, [])

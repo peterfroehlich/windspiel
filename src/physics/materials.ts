@@ -20,15 +20,30 @@ export const MATERIALS: Record<string, MaterialProps> = {
   bamboo:    { id: 'bamboo',    label: 'Bamboo',         density: 700,   youngsModulus: 18e9,  dampingQ: 120,  color: '#c2b280', metalness: 0.0,  roughness: 0.8  },
   glass:     { id: 'glass',     label: 'Glass',          density: 2500,  youngsModulus: 70e9,  dampingQ: 1500, color: '#dceef5', metalness: 0.1,  roughness: 0.05, opacity: 0.45 },
   carbon:    { id: 'carbon',    label: 'Carbon Fibre',   density: 1600,  youngsModulus: 135e9, dampingQ: 2500, color: '#22262c', metalness: 0.6,  roughness: 0.35 },
+  castIron:  { id: 'castIron',  label: 'Cast Iron',      density: 7200,  youngsModulus: 110e9, dampingQ: 350,  color: '#5a5e66', metalness: 0.7,  roughness: 0.55 },
+  pvc:       { id: 'pvc',       label: 'PVC-U',          density: 1420,  youngsModulus: 3.2e9, dampingQ: 45,   color: '#b9bcc0', metalness: 0.0,  roughness: 0.45 },
 }
 
 export const STRIKER_MATERIALS: Record<string, {
   id: string; label: string; density: number; hardness: number; // 0 = soft, 1 = hard
+  youngsModulus: number;  // Pa — for Hertzian contact duration
   color: string; roughness: number
 }> = {
-  softWood: { id: 'softWood', label: 'Softwood',  density: 500,  hardness: 0.45, color: '#a0784a', roughness: 0.85 },
-  hardWood: { id: 'hardWood', label: 'Hardwood',  density: 750,  hardness: 0.7,  color: '#7a5230', roughness: 0.75 },
-  acrylic:  { id: 'acrylic',  label: 'Acrylic',   density: 1180, hardness: 0.85, color: '#e8f4f8', roughness: 0.1  },
-  rubber:   { id: 'rubber',   label: 'Rubber',    density: 1100, hardness: 0.15, color: '#2a2a2e', roughness: 0.9  },
-  metal:    { id: 'metal',    label: 'Metal',     density: 7800, hardness: 1.0,  color: '#9aa0a8', roughness: 0.3  },
+  softWood: { id: 'softWood', label: 'Softwood',  density: 500,  hardness: 0.45, youngsModulus: 9e9,   color: '#a0784a', roughness: 0.85 },
+  hardWood: { id: 'hardWood', label: 'Hardwood',  density: 750,  hardness: 0.7,  youngsModulus: 15e9,  color: '#7a5230', roughness: 0.75 },
+  acrylic:  { id: 'acrylic',  label: 'Acrylic',   density: 1180, hardness: 0.85, youngsModulus: 3.2e9, color: '#e8f4f8', roughness: 0.1  },
+  rubber:   { id: 'rubber',   label: 'Rubber',    density: 1100, hardness: 0.15, youngsModulus: 0.05e9,color: '#2a2a2e', roughness: 0.9  },
+  metal:    { id: 'metal',    label: 'Metal',     density: 7800, hardness: 1.0,  youngsModulus: 200e9, color: '#9aa0a8', roughness: 0.3  },
+}
+
+/** Striker contact geometry. R_s [m] = striker-side radius of curvature at
+ *  the contact point (Infinity = flat face). The tube's outer radius combines
+ *  with it in Hertzian contact: 1/R_eff = 1/R_s + 1/R_tube. */
+export const STRIKER_FORMS: Record<string, {
+  id: string; label: string; R_s: (diameter_m: number) => number; note: string
+}> = {
+  disc:     { id: 'disc',     label: 'Disc (flat face)',   R_s: () => Infinity, note: 'flat face — warmest contact' },
+  sphere:   { id: 'sphere',   label: 'Sphere (dome)',      R_s: (d) => d / 2, note: 'dome — balanced' },
+  donut:    { id: 'donut',    label: 'Donut (ring edge)',  R_s: (d) => d * 0.012, note: 'ring edge — bright ping' },
+  cylinder: { id: 'cylinder', label: 'Cylinder (rim)',     R_s: (d) => d * 0.004, note: 'sharp rim — metallic clank' },
 }

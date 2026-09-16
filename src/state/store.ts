@@ -36,6 +36,7 @@ export interface ChimeConfig {
   strikerMaterial: string
   strikerDiameter_mm: number
   strikerHeight_mm: number
+  strikerForm: string            // disc | sphere | donut | cylinder (Hertzian contact)
   strikerDrop_mm: number        // top of striker below tube tops
   windStrength: number          // 0..1
   gustFrequency: number         // gusts per second
@@ -61,6 +62,7 @@ export const DEFAULT_CONFIG: ChimeConfig = {
   strikerMaterial: 'hardWood',
   strikerDiameter_mm: 55,
   strikerHeight_mm: 25,
+  strikerForm: 'sphere',
   strikerDrop_mm: 0,   // replaced below: optimal center-strike of default tuning
   windStrength: 0.35,
   sailMass_g: 30,

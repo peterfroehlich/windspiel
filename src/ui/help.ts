@@ -48,9 +48,17 @@ export const HELP: Record<string, string> = {
 
   strikerMaterial:
     'Striker material. Sets both transient and sustain character: rubber (hardness 0.15) ' +
-    'produces a soft, dull "tup" with short contact and low restitution; hardwood a warm ' +
-    'knock; metal a bright click with the highest impulse transfer (restitution 0.55 vs ' +
-    'rubber 0.17) — same swing, noticeably louder chime.',
+    'produces a soft, dull "tup" with long Hertzian contact (~2 ms) that filters out the ' +
+    'high partials; hardwood a warm knock; metal a bright click with the highest impulse ' +
+    'transfer (restitution 0.55 vs rubber 0.17) — same swing, noticeably louder chime.',
+
+  strikerForm:
+    'Contact geometry at the impact point — it shapes the tone through the Hertzian ' +
+    'contact duration τ ∝ (m²/(R_eff·E*²·v))^(1/5), a natural low-pass with bandwidth ' +
+    '≈ 0.35/τ. Rounded contacts (long τ) mute the inharmonic upper partials → smooth, ' +
+    'pure tone. Sharp rims (short contact radius) excite the 2.756× and 5.404× partials ' +
+    '→ harsh metallic clank. Note the curvature combines with the tube\'s own radius: ' +
+    'even a "flat" disc contacts a round tube at R = tube radius.',
 
   strikerDiameter:
     'Striker disc diameter. Bigger = more mass (louder, deeper transient) but needs more ' +

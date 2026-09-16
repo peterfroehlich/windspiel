@@ -142,11 +142,11 @@ describe('materials sanity', () => {
     }
   })
 
-  it('bar speeds are physically plausible (3–12 km/s)', () => {
+  it('bar speeds are physically plausible (1–12 km/s)', () => {
     for (const m of Object.values(MATERIALS)) {
       const c = Math.sqrt(m.youngsModulus / m.density)
-      expect(c).toBeGreaterThan(3000)
-      expect(c).toBeLessThan(12000)
+      expect(c).toBeGreaterThan(1000)   // PVC-U ≈ 1.5 km/s
+      expect(c).toBeLessThan(12000)     // carbon ≈ 9.2 km/s
     }
   })
 })

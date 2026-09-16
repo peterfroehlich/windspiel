@@ -2,11 +2,13 @@ import { useState, useRef, useLayoutEffect } from 'react'
 import type { ChangeEvent } from 'react'
 import { createPortal } from 'react-dom'
 import { useStore, tubeSpec, maxDrop_mm, optimalDrop_mm, equalLoudnessDrop_mm, tubeGeometry } from '../state/store'
-import { MATERIALS, STRIKER_MATERIALS } from '../physics/materials'
+import { MATERIALS, STRIKER_MATERIALS, STRIKER_FORMS } from '../physics/materials'
 import { SCALES, MOODS, NOTE_NAMES } from '../physics/scales'
 import { tubeDecay } from '../physics/tubes'
 import { strikeQuality, optimalStrikePoint, suspensionLossFactor } from '../physics/modes'
-import { estimateStrike, strikerMass } from '../physics/radiation'
+import { estimateStrike } from '../physics/radiation'
+import { partialExcitation, optimalStrikerMass, strikerMass } from '../physics/contact'
+import { tubeFrequencies } from '../physics/tubes'
 import { audio } from '../audio/engine'
 import { HELP } from './help'
 import { PhysicsModal } from './PhysicsModal'
@@ -193,7 +195,7 @@ function AcousticsInfo({ tubeIndex }: { tubeIndex?: number | null }) {
   const tube = tubes[idx]
   if (!tube) return null
   const spec = tubeSpec(config, tube, idx)
-  const striker = { material: config.strikerMaterial, diameter_mm: config.strikerDiameter_mm, height_mm: config.strikerHeight_mm }
+  const striker = { material: config.strikerMaterial, form: config.strikerForm, diameter_mm: config.strikerDiameter_mm, height_mm: config.strikerHeight_mm }
   const xi = Math.max(0.02, Math.min(0.98, (config.strikerDrop_mm / 1000) / (tube.length_mm / 1000)))
   const q = strikeQuality(xi)
   const est = estimateStrike(spec, striker, 0.3, xi)
@@ -343,10 +345,10 @@ function TubesSection() {
       <div className="row slider">
         <span className="label">Wall</span>
         <Help id="wallThickness" />
-        <input type="range" min={0.3} max={5} step={0.1} value={config.wallThickness_mm}
+        <input type="range" min={0.3} max={5} step={0.05} value={config.wallThickness_mm}
           disabled={config.solid}
           onChange={(e) => setConfig({ wallThickness_mm: parseFloat(e.target.value) })} />
-        <span className="val">{config.solid ? 'solid' : config.wallThickness_mm.toFixed(1) + ' mm'}</span>
+        <span className="val">{config.solid ? 'solid' : config.wallThickness_mm.toFixed(2) + ' mm'}</span>
       </div>
       <label className="row check">
         <input type="checkbox" checked={config.solid}
@@ -408,11 +410,11 @@ function TubesSection() {
                 </div>
                 <div className="adv-row">
                   <span className="adv-label">Wall</span>
-                  <input type="range" min={0.3} max={5} step={0.1}
+                  <input type="range" min={0.3} max={5} step={0.05}
                     value={Math.min(5, g.t === Infinity ? config.wallThickness_mm : g.t * 1000)}
                     disabled={g.solid}
                     onChange={(e) => setTubeOverride(i, { wallThickness_mm: parseFloat(e.target.value) })} />
-                  <span className="adv-val">{g.solid ? 'solid' : (g.t * 1000).toFixed(1)}</span>
+                  <span className="adv-val">{g.solid ? 'solid' : (g.t * 1000).toFixed(2)}</span>
                 </div>
                 <div className="adv-row">
                   <span className="adv-label">Solid</span>
@@ -497,13 +499,25 @@ function TuningSection() {
 
 function StrikerSection() {
   const { config, tubes, setConfig } = useStore()
+  const refSpec = tubeSpec(config, tubes[0], 0)
+  const optimal = optimalStrikerMass(refSpec) * 1000
+  const current = strikerMass({ material: config.strikerMaterial, form: config.strikerForm, diameter_mm: config.strikerDiameter_mm, height_mm: config.strikerHeight_mm }) * 1000
   return (
     <>
       <Select label="Material" value={config.strikerMaterial} helpId="strikerMaterial"
         options={Object.values(STRIKER_MATERIALS)}
         onChange={(v) => setConfig({ strikerMaterial: v })} />
+      <Select label="Form" value={config.strikerForm} helpId="strikerForm"
+        options={Object.values(STRIKER_FORMS)}
+        onChange={(v) => setConfig({ strikerForm: v })} />
       <Slider label="Striker Ø" min={25} max={100} step={1} fmt={(v) => v + ' mm'} helpId="strikerDiameter"
         value={config.strikerDiameter_mm} onChange={(v) => setConfig({ strikerDiameter_mm: v })} />
+      <div className="row">
+        <span className="label">Mass</span>
+        <span className="mass-hint" title="Optimum ≈ effective mass of the longest tube (impedance match)">
+          {current.toFixed(0)} g <span className="opt-tag">◎ optimal ≈ {optimal.toFixed(0)} g</span>
+        </span>
+      </div>
       <Slider label="Thickness" min={8} max={60} step={1} fmt={(v) => v + ' mm'} helpId="strikerHeight"
         value={config.strikerHeight_mm} onChange={(v) => setConfig({ strikerHeight_mm: v })} />
       <Slider label="Drop" min={20} max={maxDrop_mm(tubes)} step={1} fmt={(v) => v + ' mm'} helpId="strikerDrop"
@@ -546,6 +560,14 @@ function previewTube(i: number) {
   const neighbours = config.coupling
     ? tubes.filter((_, j) => j !== i).map((t, j2) => tubeSpec(config, t, j2 < i ? j2 : j2 + 1))
     : []
-  audio.strike(specOf(i), 0.85, Math.cos(a) * 0.7, xi, config.suspensionPoint, neighbours)
+  const spec = specOf(i)
+  const f0 = tubeFrequencies(spec).f0
+  const striker = {
+    material: config.strikerMaterial, form: config.strikerForm,
+    diameter_mm: config.strikerDiameter_mm, height_mm: config.strikerHeight_mm,
+  }
+  const partials = [1, 2.756, 5.404, 8.933].map((r) =>
+    partialExcitation(r * f0, striker, spec, 0.1275, xi))
+  audio.strike(spec, 0.85, Math.cos(a) * 0.7, xi, config.suspensionPoint, neighbours, { partials })
   useStore.getState().flash(i, 0.8)
 }

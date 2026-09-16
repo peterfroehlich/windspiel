@@ -88,9 +88,10 @@ export class AudioEngine {
   }
 
   /** Trigger one tube strike. velocity 0..1, pan -1..1,
-   *  strikeXi = impact position on tube 0..1, suspXi = suspension point 0..1.
-   *  neighbours: specs of the other tubes (for sympathetic coupling). */
-  strike(spec: TubeSpec, velocity: number, pan = 0, strikeXi = 0.5, suspXi = 0.224, neighbours: TubeSpec[] = []) {
+   *  strikeXi = impact position on tube 0..1, suspXi = suspension point 0..1,
+   *  neighbours: specs of the other tubes (for sympathetic coupling),
+   *  contact: Hertzian contact info → partial filtering (τ low-pass). */
+  strike(spec: TubeSpec, velocity: number, pan = 0, strikeXi = 0.5, suspXi = 0.224, neighbours: TubeSpec[] = [], contact?: { partials: number[] }) {
     if (!this.ctx) return
     const ctx = this.ctx
     const ac = analyzeTube(spec, suspXi)
@@ -106,6 +107,9 @@ export class AudioEngine {
     // (w1/w0 = overtone-vs-fundamental excitation, from exact mode shapes)
     const w = strikeWeights(strikeXi)
     const overtoneDamp = w[0] > 1e-3 ? Math.min(1, w[1] / w[0]) : 0
+    // --- Hertzian contact low-pass: long contact mutes high partials ---
+    const contactGain = (i: number) =>
+      contact ? Math.max(0.05, contact.partials[i] ?? 1) : 1
 
     // --- Striker transient: noise burst shaped by striker hardness ---
     const strikeDur = 0.02 + 0.05 * (1 - vel * 0.3)
@@ -130,7 +134,7 @@ export class AudioEngine {
       const f = ac.partials[i]
       const t60 = ac.decayTimes[i]
       if (t60 < 0.05 || f > 16000) continue
-      const modal = Math.min(1, w[i] ?? 0) * (i > 0 ? overtoneDamp : 1)
+      const modal = Math.min(1, w[i] ?? 0) * (i > 0 ? overtoneDamp : 1) * contactGain(i)
       const amp = (0.5 / (i + 1)) * vel * modal
       if (amp < 0.002) continue
       const g = ctx.createGain()
