@@ -231,6 +231,13 @@ body { font-family: system-ui, sans-serif; color: #dfe3ea; }
 }
 .footer { margin-top: 10px; }
 
+.mass-hint {
+  flex: 1; font-size: 11px; color: #aeb8cc;
+  font-variant-numeric: tabular-nums; cursor: help;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.opt-tag { color: #7ddb91; }
+
 .mood-row { display: flex; flex: 1; gap: 4px; }
 .check { cursor: pointer; }
 .check input { accent-color: #6c8cff; }

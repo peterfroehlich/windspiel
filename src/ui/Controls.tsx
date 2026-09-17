@@ -514,7 +514,21 @@ function StrikerSection() {
         value={config.strikerDiameter_mm} onChange={(v) => setConfig({ strikerDiameter_mm: v })} />
       <div className="row">
         <span className="label">Mass</span>
-        <span className="mass-hint" title="Optimum ≈ effective mass of the longest tube (impedance match)">
+        <span
+          className="mass-hint"
+          tabIndex={0}
+          title={[
+            `Your striker: ${current.toFixed(0)} g — the ◎ optimum is the mode-1 EFFECTIVE MASS of the longest tube:`,
+            `m_eff = M · ∫φ₁²dξ / φ₁(0.5)² ≈ ${(optimal / 1000).toFixed(3)} kg`,
+            'Why: energy transfer between striker and tube is maximal at the impedance',
+            'match m_striker ≈ m_eff. A much lighter striker bounces off without',
+            'transferring its kinetic energy (weak impulse J = μ(1+e)v); a much heavier',
+            'one cannot be swung by the wind sail (acceleration F/m too small → it leans',
+            'against the tubes instead of striking). μ = m_s·m_eff/(m_s+m_eff) reaches 50%',
+            'of m_eff at equality — the best compromise between impulse and wind-pumpability.',
+            'Note: geometry/material change the striker mass; the ◎ target follows the tubes.',
+          ].join('\n')}
+        >
           {current.toFixed(0)} g <span className="opt-tag">◎ optimal ≈ {optimal.toFixed(0)} g</span>
         </span>
       </div>

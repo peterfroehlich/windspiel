@@ -138,18 +138,12 @@ function Striker() {
         </mesh>
       )
       break
-    case 'cylinder': // body + rim ring (visual edge emphasis)
+    case 'cylinder': // clean cylinder (sharp-rim character is in the contact physics)
       strikerMesh = (
-        <group>
-          <mesh castShadow>
-            <cylinderGeometry args={[R, R, h, 32]} />
-            {strikeMat}
-          </mesh>
-          <mesh castShadow position={[0, h / 2, 0]}>
-            <torusGeometry args={[R * 0.98, R * 0.05, 8, 40]} />
-            {strikeMat}
-          </mesh>
-        </group>
+        <mesh castShadow>
+          <cylinderGeometry args={[R, R, h, 32]} />
+          {strikeMat}
+        </mesh>
       )
       break
     default:         // disc (flat face)
