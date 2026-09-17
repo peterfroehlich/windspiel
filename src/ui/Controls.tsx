@@ -13,6 +13,7 @@ import { audio } from '../audio/engine'
 import { HELP } from './help'
 import { PhysicsModal } from './PhysicsModal'
 import { DEFAULT_CONFIG } from '../state/store'
+import { listPresets as presetsList, savePreset, loadPreset, deletePreset } from '../state/presets'
 
 /** Config keys accepted on import (subset check against foreign JSON). */
 const DEFAULT_CONFIG_KEYS = Object.keys(DEFAULT_CONFIG) as (keyof typeof DEFAULT_CONFIG)[]
@@ -281,7 +282,6 @@ function AcousticsInfo({ tubeIndex }: { tubeIndex?: number | null }) {
 export function Controls() {
   const { reset, windOn, setWindOn } = useStore()
   const [physicsOpen, setPhysicsOpen] = useState(false)
-  const [muted, setMuted] = useState(false)
 
   const importInputRef = useRef<HTMLInputElement>(null)
 
@@ -329,6 +329,27 @@ export function Controls() {
   })
   const toggle = (id: SectionId) => setOpen((o) => ({ ...o, [id]: !o[id] }))
 
+  // localStorage presets (save/load current design by name)
+  const [saveOpen, setSaveOpen] = useState(false)
+  const [loadOpen, setLoadOpen] = useState(false)
+  const [saveName, setSaveName] = useState('')
+  const [, setPresetVersion] = useState(0)   // re-render list after save/delete
+  const listPresets = () => presetsList()    // fresh read every render
+
+  function doSave() {
+    const { config } = useStore.getState()
+    savePreset(saveName.trim(), JSON.parse(JSON.stringify(config)))
+    setSaveName('')
+    setPresetVersion((n) => n + 1)
+    setSaveOpen(false)
+  }
+
+  function doLoad(name: string) {
+    const cfg = loadPreset(name)
+    if (cfg) useStore.getState().setConfig(cfg as never)
+    setLoadOpen(false)
+  }
+
   return (
     <div className="sidebar">
       <div className="panel-header">
@@ -340,13 +361,34 @@ export function Controls() {
           style={{ display: 'none' }}
           onChange={(e) => { const f = e.target.files?.[0]; if (f) importSpec(f); e.target.value = '' }} />
         <button className="icon-btn" onClick={exportSpec} title="Export spec (JSON)">📤</button>
+        <button className="icon-btn" onClick={() => setSaveOpen((v) => !v)} title="Save configuration (browser storage)">💾</button>
+        <button className="icon-btn" onClick={() => setLoadOpen((v) => !v)} title="Load configuration (browser storage)">📂</button>
+        {saveOpen && (
+          <div className="save-pop">
+            <input className="save-name" placeholder="Name this chime…" value={saveName}
+              autoFocus onChange={(e) => setSaveName(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter' && saveName.trim()) doSave() }} />
+            <button className="btn" onClick={doSave} disabled={!saveName.trim()}>Save</button>
+            {listPresets().length > 0 && (
+              <>
+                <div className="save-title">Saved chimes</div>
+                <div className="save-list">
+                  {listPresets().map((p) => (
+                    <div key={p.name} className="save-item" onClick={() => doLoad(p.name)} title="Click to load">
+                      <span className="save-item-name">{p.name}</span>
+                      <span className="save-item-date">{new Date(p.savedAt).toLocaleDateString()}</span>
+                      <button className="adv-reset" title="Delete"
+                        onClick={(e) => { e.stopPropagation(); deletePreset(p.name); setPresetVersion((n) => n + 1) }}>✕</button>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+        )}
         <button className="mute-btn" onClick={() => setWindOn(!windOn)}
           title={windOn ? 'Stop the wind' : 'Start the wind'}>
           {windOn ? '🌬️' : '🚫'}
-        </button>
-        <button className="mute-btn" onClick={() => { const m = !muted; setMuted(m); audio.setMuted(m) }}
-          title={muted ? 'Unmute' : 'Mute'}>
-          {muted ? '🔇' : '🔈'}
         </button>
         <button className="physics-btn" onClick={() => setPhysicsOpen(true)} title="All the physics">⚛</button>
       </div>
