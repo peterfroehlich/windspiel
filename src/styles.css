@@ -181,8 +181,10 @@ body { font-family: system-ui, sans-serif; color: #dfe3ea; }
 }
 
 /* optimal-value marker overlaid on a slider track */
-.track-wrap { position: relative; flex: 1; display: flex; }
+.track-wrap { --thumb-size: 18px; position: relative; flex: 1; display: flex; }
 .track-wrap input[type="range"] { width: 100%; }
+.track-wrap input[type="range"]::-webkit-slider-thumb { width: var(--thumb-size); height: var(--thumb-size); }
+.track-wrap input[type="range"]::-moz-range-thumb { width: var(--thumb-size); height: var(--thumb-size); }
 /* translucent thumb so markers read through it (webkit + firefox) */
 .track-wrap input[type="range"]::-webkit-slider-thumb {
   background: rgba(108, 140, 255, 0.55);

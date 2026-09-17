@@ -1,4 +1,4 @@
-import { useState, useRef, useLayoutEffect } from 'react'
+import { useState, useRef, useLayoutEffect, useEffect } from 'react'
 import type { ChangeEvent } from 'react'
 import { createPortal } from 'react-dom'
 import { useStore, tubeSpec, maxDrop_mm, optimalDrop_mm, equalLoudnessDrop_mm, tubeGeometry } from '../state/store'
@@ -98,11 +98,33 @@ function Slider(props: {
   const marker2 = props.marker2 !== undefined ? rel(props.marker2) : undefined
   const hasMarker = marker !== undefined || marker2 !== undefined
 
-  /** Snap the raw value to a nearby marker (within ~3% of the range) and
+  // Marker pixel position: range inputs travel only across (width − thumbWidth),
+  // so pct must map into that reduced span, then offset by the thumb radius —
+  // otherwise the tick never aligns with the thumb center (it "lags" at the edges).
+  const wrapRef = useRef<HTMLSpanElement>(null)
+  const [, forceTick] = useState(0)
+  useEffect(() => {
+    // re-measure on layout changes (sidebar resize, font load)
+    const el = wrapRef.current
+    if (!el) return
+    const ro = new ResizeObserver(() => forceTick((n) => n + 1))
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
+
+  const markerPx = (pct: number): string => {
+    const track = wrapRef.current?.querySelector('input')
+    const w = track?.clientWidth ?? 200
+    const thumb = 18 // must match --thumb-size in CSS
+    const usable = Math.max(1, w - thumb)
+    return `${(pct * usable + thumb / 2).toFixed(1)}px`
+  }
+
+  /** Snap the raw value to a nearby marker (within ~5% of the range) and
    *  quantize to the slider step. */
   const snap = (raw: number): number => {
     const range = props.max - props.min
-    const tol = 0.03 * range
+    const tol = 0.05 * range
     for (const m of [props.marker, props.marker2]) {
       if (m !== undefined && Math.abs(raw - m) <= tol) {
         // quantize the marker to the slider's own step grid
@@ -121,7 +143,7 @@ function Slider(props: {
       <span className="label">{props.label}</span>
       {props.helpId && <Help id={props.helpId} />}
       {hasMarker ? (
-        <span className="track-wrap">
+        <span className="track-wrap" ref={wrapRef}>
           <input
             type="range"
             min={props.min}
@@ -131,11 +153,11 @@ function Slider(props: {
             onChange={onInput}
           />
           {marker !== undefined && (
-            <span className="track-marker" style={{ left: `calc(${(marker * 100).toFixed(2)}% - 1px)` }}
+            <span className="track-marker" style={{ left: markerPx(marker) }}
               title={props.markerLabel} />
           )}
           {marker2 !== undefined && (
-            <span className="track-marker amber" style={{ left: `calc(${(marker2 * 100).toFixed(2)}% - 1px)` }}
+            <span className="track-marker amber" style={{ left: markerPx(marker2) }}
               title={props.marker2Label} />
           )}
         </span>
