@@ -335,8 +335,8 @@ function TopPlate() {
   const R = config.plateRadius_mm / 1000
   const mat = <meshStandardMaterial color={config.plateColor} roughness={0.7} metalness={0.1} />
   switch (config.plateShape) {
-    case 'ring':      // ring with open center
-      return <mesh position={[0, 0.01, 0]} castShadow>
+    case 'ring':      // ring with open center, lying flat (torus is XY-native)
+      return <mesh position={[0, R * 0.16, 0]} rotation={[Math.PI / 2, 0, 0]} castShadow>
         <torusGeometry args={[R * 0.85, R * 0.16, 16, 48]} />{mat}
       </mesh>
     case 'octagon': {
