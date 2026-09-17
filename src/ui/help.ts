@@ -143,9 +143,10 @@ export const HELP: Record<string, string> = {
     'sustain. Tubes with overrides are highlighted; ⟲ resets one tube to the globals.',
 
   hanger:
-    'Decorative object between the top plate and each tube\'s suspension string ' +
-    '(the classic wooden disc on real chimes). Purely visual — no acoustic effect. ' +
-    'Pick a shape and color; "None" shows just the plain string.',
+    'The attachment at the TOP of each tube — the cap/collar/pin where the tube hangs ' +
+    'from the plate (real chimes use a wooden disc cap, a metal ring collar, or a pin ' +
+    'through the wall). Purely visual — it does not change the acoustics. Pick a type ' +
+    'and color; "None" shows the plain string vanishing into the tube.',
 
   sailShape:
     'Shape of the wind catcher at the bottom. The physics only cares about its area ' +

@@ -253,35 +253,45 @@ function Strings({ tubeCount, ringR, lengths, hangerType, hangerColor }: {
     return pts
   }, [tubeCount, ringR, lengths.join(',')])
 
-  // decorative hanger sits mid-string on each suspension
+  // Tube-top attachment: the cap/collar where the tube hangs from the plate.
+  // Sits at the tube's top (y = 0 in this group), sized to the tube radius.
+  const tubeR = 0.0125  // approx tube outer radius; purely visual
   const hangerMesh = (y: number): React.ReactNode => {
     if (hangerType === 'none') return null
     const mat = <meshStandardMaterial color={hangerColor} roughness={0.6} metalness={0.1} />
     switch (hangerType) {
-      case 'ring':
-        return <mesh position={[0, y, 0]} rotation={[Math.PI / 2, 0, 0]}>
-          <torusGeometry args={[0.011, 0.004, 10, 24]} />{mat}
+      case 'ring':        // ring collar around the tube top
+        return <mesh position={[0, y - 0.004, 0]} rotation={[Math.PI / 2, 0, 0]}>
+          <torusGeometry args={[tubeR * 1.25, 0.004, 10, 24]} />{mat}
         </mesh>
-      case 'bead':
-        return <mesh position={[0, y, 0]}>
+      case 'bead':        // ball cap on top of the tube
+        return <mesh position={[0, y + 0.008, 0]}>
           <sphereGeometry args={[0.009, 16, 12]} />{mat}
         </mesh>
-      case 'star': {
-        // 5-point star from a shape geometry
+      case 'star': {      // star plate under the tube top
         const shape = new THREE.Shape()
         for (let k = 0; k < 10; k++) {
-          const r = k % 2 === 0 ? 0.014 : 0.006
+          const r = k % 2 === 0 ? 0.018 : 0.008
           const ang = (k / 10) * Math.PI * 2 - Math.PI / 2
           const px = Math.cos(ang) * r, py = Math.sin(ang) * r
           if (k === 0) shape.moveTo(px, py); else shape.lineTo(px, py)
         }
         shape.closePath()
-        const geo = new THREE.ShapeGeometry(shape)
-        return <mesh position={[0, y, 0]} geometry={geo}>{mat}</mesh>
+        return <mesh position={[0, y - 0.002, 0]} rotation={[-Math.PI / 2, 0, 0]}
+          geometry={new THREE.ShapeGeometry(shape)}>{mat}</mesh>
       }
-      default: // disc
-        return <mesh position={[0, y, 0]}>
-          <cylinderGeometry args={[0.013, 0.013, 0.005, 20]} />{mat}
+      case 'hook':        // J-hook: small horizontal pin through the tube top
+        return <group position={[0, y - 0.003, 0]}>
+          <mesh rotation={[0, 0, Math.PI / 2]}>
+            <cylinderGeometry args={[0.0022, 0.0022, tubeR * 2.6, 12]} />{mat}
+          </mesh>
+          <mesh position={[tubeR * 1.3, 0.004, 0]}>
+            <sphereGeometry args={[0.0035, 10, 8]} />{mat}
+          </mesh>
+        </group>
+      default:            // disc: classic cap disc on the tube top
+        return <mesh position={[0, y - 0.003, 0]}>
+          <cylinderGeometry args={[tubeR * 1.5, tubeR * 1.5, 0.005, 20]} />{mat}
         </mesh>
     }
   }
@@ -293,11 +303,10 @@ function Strings({ tubeCount, ringR, lengths, hangerType, hangerColor }: {
           new THREE.Vector3(p[0], 0, p[2]),
           new THREE.Vector3(p[0], p[3], p[2]),
         ])
-        const midY = p[3] / 2
         return (
           <group key={i}>
             <primitive object={new THREE.Line(geo, new THREE.LineBasicMaterial({ color: '#666' }))} />
-            {hangerMesh(midY)}
+            {hangerMesh(0)}
           </group>
         )
       })}

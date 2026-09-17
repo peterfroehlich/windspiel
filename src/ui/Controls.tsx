@@ -613,10 +613,11 @@ function previewTube(i: number) {
 /* ───────────────────────── Optics ───────────────────────── */
 
 export const HANGER_TYPES = [
-  { id: 'disc',   label: 'Disc (flat)' },
-  { id: 'ring',   label: 'Ring (torus)' },
-  { id: 'bead',   label: 'Bead (ball)' },
-  { id: 'star',   label: 'Star' },
+  { id: 'disc',   label: 'Disc cap' },
+  { id: 'ring',   label: 'Ring collar' },
+  { id: 'bead',   label: 'Bead cap' },
+  { id: 'hook',   label: 'Hook pin' },
+  { id: 'star',   label: 'Star plate' },
   { id: 'none',   label: 'None (plain string)' },
 ] as const
 
