@@ -142,11 +142,15 @@ export const HELP: Record<string, string> = {
     '(it comes out shorter, duller and quieter), or thicken a single tube for extra ' +
     'sustain. Tubes with overrides are highlighted; ⟲ resets one tube to the globals.',
 
-  hanger:
-    'The attachment at the TOP of each tube — the cap/collar/pin where the tube hangs ' +
-    'from the plate (real chimes use a wooden disc cap, a metal ring collar, or a pin ' +
-    'through the wall). Purely visual — it does not change the acoustics. Pick a type ' +
-    'and color; "None" shows the plain string vanishing into the tube.',
+  topPlate:
+    'The suspension plate the whole chime hangs from — canopy, crown, or top disc in ' +
+    'trade terms. Choose its shape and size; the suspension circle (Tubes section) must ' +
+    'fit inside it. Purely visual — it does not affect the acoustics.',
+
+  tubeOffset:
+    'How far below the top plate the tubes START (the plate hangs on its own string, ' +
+    'then a gap, then the tubes). 0 = tubes touch the plate; larger values give an ' +
+    'airy floating look. The striker/sail geometry follows automatically.',
 
   sailShape:
     'Shape of the wind catcher at the bottom. The physics only cares about its area ' +

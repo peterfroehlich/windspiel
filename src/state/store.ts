@@ -42,9 +42,11 @@ export interface ChimeConfig {
   gustFrequency: number         // gusts per second
   sailMass_g: number            // wind-catcher mass (areal density of the board)
   volume: number
-  // Optics: decorative hangers between top plate and tubes + sail shape/color
-  hangerType: string            // disc | ring | bead | star | none
-  hangerColor: string
+  // Optics: top plate + sail shape/color
+  plateShape: string            // disc | ring | octagon | square
+  plateRadius_mm: number
+  plateColor: string
+  tubeDrop_mm: number           // how far below the plate the tubes start
   sailType: string              // rectangle | diamond | circle | teardrop | feather
   sailColor: string
 }
@@ -71,8 +73,10 @@ export const DEFAULT_CONFIG: ChimeConfig = {
   strikerDrop_mm: 0,   // replaced below: optimal center-strike of default tuning
   windStrength: 0.35,
   sailMass_g: 30,
-  hangerType: 'disc',
-  hangerColor: '#8a5a34',
+  plateShape: 'disc',
+  plateRadius_mm: 90,
+  plateColor: '#3a2f24',
+  tubeDrop_mm: 30,
   sailType: 'rectangle',
   sailColor: '#8b3a3a',
   gustFrequency: 0.15,

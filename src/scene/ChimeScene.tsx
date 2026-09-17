@@ -11,7 +11,7 @@ import { tubeFrequencies } from '../physics/tubes'
 
 export const windSim = new WindSim()
 
-function TubeMesh({ index }: { index: number }) {
+function TubeMesh({ index, dropY }: { index: number; dropY: number }) {
   const { config, tubes } = useStore()
   const tube = tubes[index]
   const geo = tubeGeometry(config, index)
@@ -53,7 +53,7 @@ function TubeMesh({ index }: { index: number }) {
   })
 
   return (
-    <group ref={pivotRef} position={[x, -s, z]}>
+    <group ref={pivotRef} position={[x, -dropY - s, z]}>
       <mesh position={[0, s - L / 2, 0]} castShadow
         onPointerDown={(e) => {
           e.stopPropagation()
@@ -77,7 +77,7 @@ function TubeMesh({ index }: { index: number }) {
   )
 }
 
-function Striker() {
+function Striker({ dropY }: { dropY: number }) {
   const { config } = useStore()
   const mat = STRIKER_MATERIALS[config.strikerMaterial]
   const ref = useRef<THREE.Group>(null)
@@ -101,7 +101,7 @@ function Striker() {
     // string endpoints: plate underside center → striker top (striker tilts,
     // so attach at the tilted top surface)
     const pos = hangGeo.attributes.position as THREE.BufferAttribute
-    const yStriker = -(config.strikerDrop_mm / 1000)
+    const yStriker = -dropY - config.strikerDrop_mm / 1000
     const tiltZ = -wind.x * 2.0, tiltX = wind.z * 2.0
     // top point of the tilted striker disc, in world coords
     const halfH = config.strikerHeight_mm / 2000
@@ -113,7 +113,7 @@ function Striker() {
     pos.needsUpdate = true
   })
 
-  const y = -(config.strikerDrop_mm / 1000)
+  const y = -dropY - config.strikerDrop_mm / 1000
   // striker geometry follows the selected contact form
   const R = config.strikerDiameter_mm / 2000
   const h = config.strikerHeight_mm / 1000
@@ -122,18 +122,18 @@ function Striker() {
   )
   let strikerMesh: React.ReactNode
   switch (config.strikerForm) {
-    case 'sphere':   // ball
+    case 'sphere':   // oblate ellipsoid: diameter fixed, thickness = slider
       strikerMesh = (
-        <mesh castShadow>
+        <mesh castShadow scale={[1, Math.max(0.2, h / (2 * R)), 1]}>
           <sphereGeometry args={[R, 32, 16]} />
           {strikeMat}
         </mesh>
       )
       break
-    case 'donut':    // torus ring
+    case 'donut':    // torus ring: minor radius (thickness) follows the slider
       strikerMesh = (
         <mesh castShadow rotation={[Math.PI / 2, 0, 0]}>
-          <torusGeometry args={[R * 0.72, Math.max(0.006, R * 0.28), 16, 40]} />
+          <torusGeometry args={[Math.max(R * 0.35, R - h / 2), Math.max(0.004, h / 2), 16, 40]} />
           {strikeMat}
         </mesh>
       )
@@ -164,7 +164,7 @@ function Striker() {
   )
 }
 
-function Sail() {
+function Sail({ dropY }: { dropY: number }) {
   const { config, tubes } = useStore()
   const ref = useRef<THREE.Mesh>(null)
   const stringRef = useRef<THREE.Line>(null)
@@ -180,7 +180,7 @@ function Sail() {
     // string from striker bottom to sail top, tracking both
     if (stringRef.current) {
       const pos = stringRef.current.geometry.attributes.position as THREE.BufferAttribute
-      const strikerY = -(config.strikerDrop_mm / 1000)
+      const strikerY = -dropY - config.strikerDrop_mm / 1000
       const yTop = strikerY - config.strikerHeight_mm / 2000
       pos.setXYZ(0, wind.x, yTop, wind.z)
       pos.setXYZ(1, wind.sailX, ref.current!.position.y + 0.06, wind.sailZ)
@@ -238,9 +238,8 @@ function Sail() {
   )
 }
 
-function Strings({ tubeCount, ringR, lengths, hangerType, hangerColor }: {
-  tubeCount: number; ringR: number; lengths: number[]
-  hangerType: string; hangerColor: string
+function Strings({ tubeCount, ringR, lengths, dropY }: {
+  tubeCount: number; ringR: number; lengths: number[]; dropY: number
 }) {
   const lines = useMemo(() => {
     const pts: [number, number, number, number][] = []
@@ -253,51 +252,8 @@ function Strings({ tubeCount, ringR, lengths, hangerType, hangerColor }: {
     return pts
   }, [tubeCount, ringR, lengths.join(',')])
 
-  // Tube-top attachment: the cap/collar where the tube hangs from the plate.
-  // Sits at the tube's top (y = 0 in this group), sized to the tube radius.
-  const tubeR = 0.0125  // approx tube outer radius; purely visual
-  const hangerMesh = (y: number): React.ReactNode => {
-    if (hangerType === 'none') return null
-    const mat = <meshStandardMaterial color={hangerColor} roughness={0.6} metalness={0.1} />
-    switch (hangerType) {
-      case 'ring':        // ring collar around the tube top
-        return <mesh position={[0, y - 0.004, 0]} rotation={[Math.PI / 2, 0, 0]}>
-          <torusGeometry args={[tubeR * 1.25, 0.004, 10, 24]} />{mat}
-        </mesh>
-      case 'bead':        // ball cap on top of the tube
-        return <mesh position={[0, y + 0.008, 0]}>
-          <sphereGeometry args={[0.009, 16, 12]} />{mat}
-        </mesh>
-      case 'star': {      // star plate under the tube top
-        const shape = new THREE.Shape()
-        for (let k = 0; k < 10; k++) {
-          const r = k % 2 === 0 ? 0.018 : 0.008
-          const ang = (k / 10) * Math.PI * 2 - Math.PI / 2
-          const px = Math.cos(ang) * r, py = Math.sin(ang) * r
-          if (k === 0) shape.moveTo(px, py); else shape.lineTo(px, py)
-        }
-        shape.closePath()
-        return <mesh position={[0, y - 0.002, 0]} rotation={[-Math.PI / 2, 0, 0]}
-          geometry={new THREE.ShapeGeometry(shape)}>{mat}</mesh>
-      }
-      case 'hook':        // J-hook: small horizontal pin through the tube top
-        return <group position={[0, y - 0.003, 0]}>
-          <mesh rotation={[0, 0, Math.PI / 2]}>
-            <cylinderGeometry args={[0.0022, 0.0022, tubeR * 2.6, 12]} />{mat}
-          </mesh>
-          <mesh position={[tubeR * 1.3, 0.004, 0]}>
-            <sphereGeometry args={[0.0035, 10, 8]} />{mat}
-          </mesh>
-        </group>
-      default:            // disc: classic cap disc on the tube top
-        return <mesh position={[0, y - 0.003, 0]}>
-          <cylinderGeometry args={[tubeR * 1.5, tubeR * 1.5, 0.005, 20]} />{mat}
-        </mesh>
-    }
-  }
-
   return (
-    <group>
+    <group position={[0, -dropY, 0]}>
       {lines.map((p, i) => {
         const geo = new THREE.BufferGeometry().setFromPoints([
           new THREE.Vector3(p[0], 0, p[2]),
@@ -306,7 +262,6 @@ function Strings({ tubeCount, ringR, lengths, hangerType, hangerColor }: {
         return (
           <group key={i}>
             <primitive object={new THREE.Line(geo, new THREE.LineBasicMaterial({ color: '#666' }))} />
-            {hangerMesh(0)}
           </group>
         )
       })}
@@ -375,8 +330,41 @@ function Simulator() {
   return null
 }
 
+function TopPlate() {
+  const { config } = useStore()
+  const R = config.plateRadius_mm / 1000
+  const mat = <meshStandardMaterial color={config.plateColor} roughness={0.7} metalness={0.1} />
+  switch (config.plateShape) {
+    case 'ring':      // ring with open center
+      return <mesh position={[0, 0.01, 0]} castShadow>
+        <torusGeometry args={[R * 0.85, R * 0.16, 16, 48]} />{mat}
+      </mesh>
+    case 'octagon': {
+      const s = new THREE.Shape()
+      for (let k = 0; k < 8; k++) {
+        const a = (k / 8) * Math.PI * 2 + Math.PI / 8
+        const px = Math.cos(a) * R, py = Math.sin(a) * R
+        if (k === 0) s.moveTo(px, py); else s.lineTo(px, py)
+      }
+      s.closePath()
+      return <mesh position={[0, 0.005, 0]} castShadow rotation={[-Math.PI / 2, 0, 0]}>
+        <extrudeGeometry args={[s, { depth: 0.02, bevelEnabled: false }]} />{mat}
+      </mesh>
+    }
+    case 'square':
+      return <mesh position={[0, 0.005, 0]} castShadow rotation={[-Math.PI / 2, 0, 0]}>
+        <boxGeometry args={[R * 1.8, R * 1.8, 0.02]} />{mat}
+      </mesh>
+    default:          // disc
+      return <mesh position={[0, 0.01, 0]} castShadow>
+        <cylinderGeometry args={[R, R, 0.02, 48]} />{mat}
+      </mesh>
+  }
+}
+
 export function ChimeScene() {
   const { config, tubes } = useStore()
+  const dropY = config.tubeDrop_mm / 1000   // plate → tube-start gap
   return (
     <>
       {/* no scene background: page CSS provides it, keeping the WebGL canvas
@@ -386,16 +374,12 @@ export function ChimeScene() {
       <directionalLight position={[3, 6, 4]} intensity={2} castShadow />
       <Environment preset="city" />
       <group position={[0, 1.6, 0]}>
-        <mesh position={[0, 0.01, 0]}>
-          <cylinderGeometry args={[0.09, 0.09, 0.02, 32]} />
-          <meshStandardMaterial color="#3a2f24" roughness={0.7} />
-        </mesh>
-        {Array.from({ length: config.tubeCount }, (_, i) => <TubeMesh key={i} index={i} />)}
-        <Striker />
-        <Sail />
+        <TopPlate />
+        {Array.from({ length: config.tubeCount }, (_, i) => <TubeMesh key={i} index={i} dropY={dropY} />)}
+        <Striker dropY={dropY} />
+        <Sail dropY={dropY} />
         <Strings tubeCount={config.tubeCount} ringR={config.suspensionRadius_mm / 1000}
-          lengths={tubes.map((t) => t.length_mm / 1000)}
-          hangerType={config.hangerType} hangerColor={config.hangerColor} />
+          lengths={tubes.map((t) => t.length_mm / 1000)} dropY={dropY} />
         <Simulator />
       </group>
       <ContactShadows position={[0, -0.4, 0]} opacity={0.4} scale={4} blur={2.5} far={2} />

@@ -612,13 +612,11 @@ function previewTube(i: number) {
 
 /* ───────────────────────── Optics ───────────────────────── */
 
-export const HANGER_TYPES = [
-  { id: 'disc',   label: 'Disc cap' },
-  { id: 'ring',   label: 'Ring collar' },
-  { id: 'bead',   label: 'Bead cap' },
-  { id: 'hook',   label: 'Hook pin' },
-  { id: 'star',   label: 'Star plate' },
-  { id: 'none',   label: 'None (plain string)' },
+export const PLATE_TYPES = [
+  { id: 'disc',    label: 'Disc' },
+  { id: 'ring',    label: 'Ring (open center)' },
+  { id: 'octagon', label: 'Octagon' },
+  { id: 'square',  label: 'Square' },
 ] as const
 
 export const SAIL_TYPES = [
@@ -644,11 +642,15 @@ function OpticsSection() {
   const { config, setConfig } = useStore()
   return (
     <>
-      <Select label="Hanger" value={config.hangerType} helpId="hanger"
-        options={HANGER_TYPES as unknown as { id: string; label: string }[]}
-        onChange={(v) => setConfig({ hangerType: v })} />
-      <ColorRow label="Color" value={config.hangerColor}
-        onChange={(c) => setConfig({ hangerColor: c })} />
+      <Select label="Top plate" value={config.plateShape} helpId="topPlate"
+        options={PLATE_TYPES as unknown as { id: string; label: string }[]}
+        onChange={(v) => setConfig({ plateShape: v })} />
+      <Slider label="Plate Ø" min={60} max={200} step={2} fmt={(v) => v + ' mm'} helpId="topPlate"
+        value={config.plateRadius_mm * 2} onChange={(v) => setConfig({ plateRadius_mm: v / 2 })} />
+      <ColorRow label="Plate color" value={config.plateColor}
+        onChange={(c) => setConfig({ plateColor: c })} />
+      <Slider label="Tube offset" min={0} max={100} step={1} fmt={(v) => v + ' mm'} helpId="tubeOffset"
+        value={config.tubeDrop_mm} onChange={(v) => setConfig({ tubeDrop_mm: v })} />
       <Select label="Sail shape" value={config.sailType} helpId="sailShape"
         options={SAIL_TYPES as unknown as { id: string; label: string }[]}
         onChange={(v) => setConfig({ sailType: v })} />
