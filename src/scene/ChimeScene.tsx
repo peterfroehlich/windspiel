@@ -198,18 +198,50 @@ function Sail() {
     return g
   }, [])
   const stringLine = useMemo(() => new THREE.Line(geo, new THREE.LineBasicMaterial({ color: '#999' })), [geo])
+
+  // sail geometry follows the selected shape (similar visual area across shapes)
+  const sailMesh = (() => {
+    const mat = <meshStandardMaterial color={config.sailColor} roughness={0.6} side={THREE.DoubleSide} />
+    switch (config.sailType) {
+      case 'diamond': {
+        const s = new THREE.Shape()
+        s.moveTo(0, 0.08); s.lineTo(0.05, 0); s.lineTo(0, -0.08); s.lineTo(-0.05, 0); s.closePath()
+        return <mesh ref={ref} position={[0, y, 0]} castShadow geometry={new THREE.ShapeGeometry(s)}>{mat}</mesh>
+      }
+      case 'circle':
+        return <mesh ref={ref} position={[0, y, 0]} castShadow>
+          <circleGeometry args={[0.055, 32]} />{mat}
+        </mesh>
+      case 'teardrop': {
+        const s = new THREE.Shape()
+        s.moveTo(0, 0.09)
+        s.bezierCurveTo(0.055, 0.03, 0.05, -0.04, 0, -0.07)
+        s.bezierCurveTo(-0.05, -0.04, -0.055, 0.03, 0, 0.09)
+        return <mesh ref={ref} position={[0, y, 0]} castShadow geometry={new THREE.ShapeGeometry(s, 24)}>{mat}</mesh>
+      }
+      case 'feather': // narrow vertical slat
+        return <mesh ref={ref} position={[0, y, 0]} castShadow>
+          <boxGeometry args={[0.028, 0.13, 0.003]} />{mat}
+        </mesh>
+      default: // rectangle
+        return <mesh ref={ref} position={[0, y, 0]} castShadow>
+          <boxGeometry args={[0.08, 0.12, 0.004]} />{mat}
+        </mesh>
+    }
+  })()
+
   return (
     <>
-      <mesh ref={ref} position={[0, y, 0]} castShadow>
-        <boxGeometry args={[0.08, 0.12, 0.004]} />
-        <meshStandardMaterial color="#8b3a3a" roughness={0.6} />
-      </mesh>
+      {sailMesh}
       <primitive ref={stringRef} object={stringLine} />
     </>
   )
 }
 
-function Strings({ tubeCount, ringR, lengths }: { tubeCount: number; ringR: number; lengths: number[] }) {
+function Strings({ tubeCount, ringR, lengths, hangerType, hangerColor }: {
+  tubeCount: number; ringR: number; lengths: number[]
+  hangerType: string; hangerColor: string
+}) {
   const lines = useMemo(() => {
     const pts: [number, number, number, number][] = []
     for (let i = 0; i < tubeCount; i++) {
@@ -221,6 +253,39 @@ function Strings({ tubeCount, ringR, lengths }: { tubeCount: number; ringR: numb
     return pts
   }, [tubeCount, ringR, lengths.join(',')])
 
+  // decorative hanger sits mid-string on each suspension
+  const hangerMesh = (y: number): React.ReactNode => {
+    if (hangerType === 'none') return null
+    const mat = <meshStandardMaterial color={hangerColor} roughness={0.6} metalness={0.1} />
+    switch (hangerType) {
+      case 'ring':
+        return <mesh position={[0, y, 0]} rotation={[Math.PI / 2, 0, 0]}>
+          <torusGeometry args={[0.011, 0.004, 10, 24]} />{mat}
+        </mesh>
+      case 'bead':
+        return <mesh position={[0, y, 0]}>
+          <sphereGeometry args={[0.009, 16, 12]} />{mat}
+        </mesh>
+      case 'star': {
+        // 5-point star from a shape geometry
+        const shape = new THREE.Shape()
+        for (let k = 0; k < 10; k++) {
+          const r = k % 2 === 0 ? 0.014 : 0.006
+          const ang = (k / 10) * Math.PI * 2 - Math.PI / 2
+          const px = Math.cos(ang) * r, py = Math.sin(ang) * r
+          if (k === 0) shape.moveTo(px, py); else shape.lineTo(px, py)
+        }
+        shape.closePath()
+        const geo = new THREE.ShapeGeometry(shape)
+        return <mesh position={[0, y, 0]} geometry={geo}>{mat}</mesh>
+      }
+      default: // disc
+        return <mesh position={[0, y, 0]}>
+          <cylinderGeometry args={[0.013, 0.013, 0.005, 20]} />{mat}
+        </mesh>
+    }
+  }
+
   return (
     <group>
       {lines.map((p, i) => {
@@ -228,8 +293,12 @@ function Strings({ tubeCount, ringR, lengths }: { tubeCount: number; ringR: numb
           new THREE.Vector3(p[0], 0, p[2]),
           new THREE.Vector3(p[0], p[3], p[2]),
         ])
+        const midY = p[3] / 2
         return (
-          <primitive key={i} object={new THREE.Line(geo, new THREE.LineBasicMaterial({ color: '#666' }))} />
+          <group key={i}>
+            <primitive object={new THREE.Line(geo, new THREE.LineBasicMaterial({ color: '#666' }))} />
+            {hangerMesh(midY)}
+          </group>
         )
       })}
     </group>
@@ -316,7 +385,8 @@ export function ChimeScene() {
         <Striker />
         <Sail />
         <Strings tubeCount={config.tubeCount} ringR={config.suspensionRadius_mm / 1000}
-          lengths={tubes.map((t) => t.length_mm / 1000)} />
+          lengths={tubes.map((t) => t.length_mm / 1000)}
+          hangerType={config.hangerType} hangerColor={config.hangerColor} />
         <Simulator />
       </group>
       <ContactShadows position={[0, -0.4, 0]} opacity={0.4} scale={4} blur={2.5} far={2} />

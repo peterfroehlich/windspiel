@@ -142,6 +142,17 @@ export const HELP: Record<string, string> = {
     '(it comes out shorter, duller and quieter), or thicken a single tube for extra ' +
     'sustain. Tubes with overrides are highlighted; ⟲ resets one tube to the globals.',
 
+  hanger:
+    'Decorative object between the top plate and each tube\'s suspension string ' +
+    '(the classic wooden disc on real chimes). Purely visual — no acoustic effect. ' +
+    'Pick a shape and color; "None" shows just the plain string.',
+
+  sailShape:
+    'Shape of the wind catcher at the bottom. The physics only cares about its area ' +
+    'and mass (set in the Wind section), so the shape is an aesthetic choice — but it ' +
+    'changes how much of the swinging is visible: a big flat rectangle catches the eye, ' +
+    'a feather slat looks subtle. Color is fully customizable.',
+
   exportSpec:
     'Downloads the current design as JSON: every note, frequency, computed tube length ' +
     'and decay time — a build sheet for actually making this chime in a workshop.',

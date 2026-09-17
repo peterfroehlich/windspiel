@@ -183,12 +183,23 @@ body { font-family: system-ui, sans-serif; color: #dfe3ea; }
 /* optimal-value marker overlaid on a slider track */
 .track-wrap { position: relative; flex: 1; display: flex; }
 .track-wrap input[type="range"] { width: 100%; }
+/* translucent thumb so markers read through it (webkit + firefox) */
+.track-wrap input[type="range"]::-webkit-slider-thumb {
+  background: rgba(108, 140, 255, 0.55);
+  box-shadow: 0 0 0 2px rgba(108, 140, 255, 0.25);
+}
+.track-wrap input[type="range"]::-moz-range-thumb {
+  background: rgba(108, 140, 255, 0.55);
+  box-shadow: 0 0 0 2px rgba(108, 140, 255, 0.25);
+  border: none;
+}
 .track-marker {
-  position: absolute; top: 50%; width: 2px; height: 12px;
+  position: absolute; top: 50%; width: 3px; height: 14px;
   transform: translateY(-50%);
-  background: #7ddb91; border-radius: 1px;
+  background: #7ddb91; border-radius: 2px;
   pointer-events: none;
-  box-shadow: 0 0 4px rgba(125, 219, 145, 0.8);
+  box-shadow: 0 0 5px rgba(125, 219, 145, 0.9);
+  z-index: 2;
 }
 .track-marker.amber {
   background: #e8b45a;
@@ -237,6 +248,13 @@ body { font-family: system-ui, sans-serif; color: #dfe3ea; }
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .opt-tag { color: #7ddb91; }
+
+.color-input {
+  width: 34px; height: 24px; padding: 0; border: 1px solid #2a3242;
+  border-radius: 6px; background: none; cursor: pointer;
+}
+.color-input::-webkit-color-swatch-wrapper { padding: 2px; }
+.color-input::-webkit-color-swatch { border: none; border-radius: 4px; }
 
 .mood-row { display: flex; flex: 1; gap: 4px; }
 .check { cursor: pointer; }

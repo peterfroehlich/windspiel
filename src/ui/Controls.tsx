@@ -17,8 +17,8 @@ import { DEFAULT_CONFIG } from '../state/store'
 /** Config keys accepted on import (subset check against foreign JSON). */
 const DEFAULT_CONFIG_KEYS = Object.keys(DEFAULT_CONFIG) as (keyof typeof DEFAULT_CONFIG)[]
 
-function Help({ id }: { id: keyof typeof HELP | string }) {
-  const text = HELP[id]
+function Help({ id, custom }: { id: keyof typeof HELP | string; custom?: string }) {
+  const text = custom ?? HELP[id]
   const [open, setOpen] = useState(false)
   const [pos, setPos] = useState<{ x: number; y: number; below: boolean } | null>(null)
   const badgeRef = useRef<HTMLSpanElement>(null)
@@ -97,6 +97,25 @@ function Slider(props: {
   const marker = props.marker !== undefined ? rel(props.marker) : undefined
   const marker2 = props.marker2 !== undefined ? rel(props.marker2) : undefined
   const hasMarker = marker !== undefined || marker2 !== undefined
+
+  /** Snap the raw value to a nearby marker (within ~3% of the range) and
+   *  quantize to the slider step. */
+  const snap = (raw: number): number => {
+    const range = props.max - props.min
+    const tol = 0.03 * range
+    for (const m of [props.marker, props.marker2]) {
+      if (m !== undefined && Math.abs(raw - m) <= tol) {
+        // quantize the marker to the slider's own step grid
+        return Math.round((m - props.min) / props.step) * props.step + props.min
+      }
+    }
+    return raw
+  }
+
+  const onInput = (e: ChangeEvent<HTMLInputElement>) => {
+    props.onChange(snap(parseFloat(e.target.value)))
+  }
+
   return (
     <div className="row slider">
       <span className="label">{props.label}</span>
@@ -109,7 +128,7 @@ function Slider(props: {
             max={props.max}
             step={props.step}
             value={props.value}
-            onChange={(e: ChangeEvent<HTMLInputElement>) => props.onChange(parseFloat(e.target.value))}
+            onChange={onInput}
           />
           {marker !== undefined && (
             <span className="track-marker" style={{ left: `calc(${(marker * 100).toFixed(2)}% - 1px)` }}
@@ -158,7 +177,7 @@ function specOf(i: number) {
   return tubeSpec(config, tubes[i], i)
 }
 
-type SectionId = 'tubes' | 'tuning' | 'striker' | 'wind'
+type SectionId = 'tubes' | 'tuning' | 'striker' | 'wind' | 'optics'
 
 /** Collapsible sidebar section. Multiple sections can be open at once and the
  *  sidebar scrolls. Folded sections unmount (cheap) — all values are derived
@@ -282,8 +301,10 @@ export function Controls() {
     a.click()
   }
 
-  // default: Tubes + Tuning open, Striker + Wind folded; multi-open, scrollable
-  const [open, setOpen] = useState<Record<SectionId, boolean>>({ tubes: true, striker: false, wind: false, tuning: true })
+  // default: Tubes + Tuning open; everything else folded; multi-open, scrollable
+  const [open, setOpen] = useState<Record<SectionId, boolean>>({
+    tubes: true, striker: false, wind: false, tuning: true, optics: false,
+  })
   const toggle = (id: SectionId) => setOpen((o) => ({ ...o, [id]: !o[id] }))
 
   return (
@@ -321,6 +342,9 @@ export function Controls() {
         </Section>
         <Section id="wind" title="Wind" open={open} toggle={toggle}>
           <WindSection />
+        </Section>
+        <Section id="optics" title="Optics" open={open} toggle={toggle}>
+          <OpticsSection />
         </Section>
       </div>
     </div>
@@ -514,10 +538,9 @@ function StrikerSection() {
         value={config.strikerDiameter_mm} onChange={(v) => setConfig({ strikerDiameter_mm: v })} />
       <div className="row">
         <span className="label">Mass</span>
-        <span
-          className="mass-hint"
-          tabIndex={0}
-          title={[
+        <Help
+          id="strikerMass"
+          custom={[
             `Your striker: ${current.toFixed(0)} g — the ◎ optimum is the mode-1 EFFECTIVE MASS of the longest tube:`,
             `m_eff = M · ∫φ₁²dξ / φ₁(0.5)² ≈ ${(optimal / 1000).toFixed(3)} kg`,
             'Why: energy transfer between striker and tube is maximal at the impedance',
@@ -527,8 +550,9 @@ function StrikerSection() {
             'against the tubes instead of striking). μ = m_s·m_eff/(m_s+m_eff) reaches 50%',
             'of m_eff at equality — the best compromise between impulse and wind-pumpability.',
             'Note: geometry/material change the striker mass; the ◎ target follows the tubes.',
-          ].join('\n')}
-        >
+          ].join(' ')}
+        />
+        <span className="mass-hint">
           {current.toFixed(0)} g <span className="opt-tag">◎ optimal ≈ {optimal.toFixed(0)} g</span>
         </span>
       </div>
@@ -584,4 +608,51 @@ function previewTube(i: number) {
     partialExcitation(r * f0, striker, spec, 0.1275, xi))
   audio.strike(spec, 0.85, Math.cos(a) * 0.7, xi, config.suspensionPoint, neighbours, { partials })
   useStore.getState().flash(i, 0.8)
+}
+
+/* ───────────────────────── Optics ───────────────────────── */
+
+export const HANGER_TYPES = [
+  { id: 'disc',   label: 'Disc (flat)' },
+  { id: 'ring',   label: 'Ring (torus)' },
+  { id: 'bead',   label: 'Bead (ball)' },
+  { id: 'star',   label: 'Star' },
+  { id: 'none',   label: 'None (plain string)' },
+] as const
+
+export const SAIL_TYPES = [
+  { id: 'rectangle', label: 'Rectangle' },
+  { id: 'diamond',   label: 'Diamond' },
+  { id: 'circle',    label: 'Circle (disc)' },
+  { id: 'teardrop',  label: 'Teardrop' },
+  { id: 'feather',   label: 'Feather (slat)' },
+] as const
+
+function ColorRow({ label, value, onChange }: { label: string; value: string; onChange: (c: string) => void }) {
+  return (
+    <div className="row">
+      <span className="label">{label}</span>
+      <input type="color" className="color-input" value={value}
+        onChange={(e) => onChange(e.target.value)} />
+      <span className="val" style={{ textTransform: 'uppercase' }}>{value}</span>
+    </div>
+  )
+}
+
+function OpticsSection() {
+  const { config, setConfig } = useStore()
+  return (
+    <>
+      <Select label="Hanger" value={config.hangerType} helpId="hanger"
+        options={HANGER_TYPES as unknown as { id: string; label: string }[]}
+        onChange={(v) => setConfig({ hangerType: v })} />
+      <ColorRow label="Color" value={config.hangerColor}
+        onChange={(c) => setConfig({ hangerColor: c })} />
+      <Select label="Sail shape" value={config.sailType} helpId="sailShape"
+        options={SAIL_TYPES as unknown as { id: string; label: string }[]}
+        onChange={(v) => setConfig({ sailType: v })} />
+      <ColorRow label="Sail color" value={config.sailColor}
+        onChange={(c) => setConfig({ sailColor: c })} />
+    </>
+  )
 }
