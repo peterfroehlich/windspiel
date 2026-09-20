@@ -331,7 +331,6 @@ export function Controls() {
 
   // localStorage presets (save/load current design by name)
   const [saveOpen, setSaveOpen] = useState(false)
-  const [loadOpen, setLoadOpen] = useState(false)
   const [saveName, setSaveName] = useState('')
   const [, setPresetVersion] = useState(0)   // re-render list after save/delete
   const listPresets = () => presetsList()    // fresh read every render
@@ -347,7 +346,7 @@ export function Controls() {
   function doLoad(name: string) {
     const cfg = loadPreset(name)
     if (cfg) useStore.getState().setConfig(cfg as never)
-    setLoadOpen(false)
+    setSaveOpen(false)
   }
 
   return (
@@ -361,8 +360,7 @@ export function Controls() {
           style={{ display: 'none' }}
           onChange={(e) => { const f = e.target.files?.[0]; if (f) importSpec(f); e.target.value = '' }} />
         <button className="icon-btn" onClick={exportSpec} title="Export spec (JSON)">📤</button>
-        <button className="icon-btn" onClick={() => setSaveOpen((v) => !v)} title="Save configuration (browser storage)">💾</button>
-        <button className="icon-btn" onClick={() => setLoadOpen((v) => !v)} title="Load configuration (browser storage)">📂</button>
+        <button className="icon-btn" onClick={() => setSaveOpen((v) => !v)} title="Save / load configurations (browser storage)">💾</button>
         {saveOpen && (
           <div className="save-pop">
             <input className="save-name" placeholder="Name this chime…" value={saveName}
@@ -746,6 +744,34 @@ function OpticsSection() {
 function ManufacturingSection() {
   const { config, tubes } = useStore()
   const [copied, setCopied] = useState(false)
+  const wrapRef = useRef<HTMLDivElement>(null)
+  const [canScrollRight, setCanScrollRight] = useState(false)
+  const [canScrollLeft, setCanScrollLeft] = useState(false)
+
+  const checkScroll = () => {
+    const el = wrapRef.current
+    if (!el) return
+    const maxScroll = el.scrollWidth - el.clientWidth
+    setCanScrollLeft(el.scrollLeft > 4)
+    setCanScrollRight(maxScroll > 4 && el.scrollLeft < maxScroll - 4)
+  }
+
+  useEffect(() => {
+    checkScroll()
+    const id = requestAnimationFrame(checkScroll)
+    window.addEventListener('resize', checkScroll)
+    return () => {
+      cancelAnimationFrame(id)
+      window.removeEventListener('resize', checkScroll)
+    }
+  }, [tubes, config])
+
+  const scrollRight = () => {
+    wrapRef.current?.scrollBy({ left: 100, behavior: 'smooth' })
+  }
+  const scrollLeft = () => {
+    wrapRef.current?.scrollBy({ left: -100, behavior: 'smooth' })
+  }
 
   const copyCutList = () => {
     const headers = ['Tube', 'Note', 'Material', 'Outer Ø (mm)', 'Wall (mm)', 'Length (mm)', 'Suspension Pos (mm from top)']
@@ -764,41 +790,53 @@ function ManufacturingSection() {
 
   return (
     <div className="mfg-section">
-      <div className="mfg-table-wrap">
-        <table className="mfg-table">
-          <thead>
-            <tr>
-              <th title="Tube index & note">Tube</th>
-              <th title="Tube material">Material</th>
-              <th title="Outer diameter in mm">Ø</th>
-              <th title="Wall thickness in mm">Wall</th>
-              <th title="Cut length in mm">Length</th>
-              <th title="Suspension hole distance from top end in mm">Susp.</th>
-            </tr>
-          </thead>
-          <tbody>
-            {tubes.map((t, i) => {
-              const g = tubeGeometry(config, i)
-              const susp_mm = t.length_mm * config.suspensionPoint
-              const matLabel = MATERIALS[g.material]?.label ?? g.material
-              const dia_mm = (g.Do * 1000).toFixed(1)
-              const wall_mm = g.solid ? 'solid' : (g.t * 1000).toFixed(2) + ' mm'
-              return (
-                <tr key={i}>
-                  <td>
-                    <span className="mfg-idx">#{i + 1}</span>{' '}
-                    <span className="mfg-note">{t.note}</span>
-                  </td>
-                  <td className="mfg-mat" title={matLabel}>{matLabel}</td>
-                  <td className="mfg-num">{dia_mm} mm</td>
-                  <td className="mfg-num">{wall_mm}</td>
-                  <td className="mfg-num mfg-len">{t.length_mm.toFixed(1)} mm</td>
-                  <td className="mfg-num mfg-susp">{susp_mm.toFixed(1)} mm</td>
-                </tr>
-              )
-            })}
-          </tbody>
-        </table>
+      <div className="mfg-container">
+        {canScrollLeft && (
+          <button className="mfg-scroll-hint left" onClick={scrollLeft} title="Scroll left">
+            ‹
+          </button>
+        )}
+        {canScrollRight && (
+          <button className="mfg-scroll-hint right" onClick={scrollRight} title="Scroll right for suspension position">
+            <span>more ›</span>
+          </button>
+        )}
+        <div className="mfg-table-wrap" ref={wrapRef} onScroll={checkScroll}>
+          <table className="mfg-table">
+            <thead>
+              <tr>
+                <th title="Tube index & note">Tube</th>
+                <th title="Tube material">Material</th>
+                <th title="Outer diameter in mm">Ø</th>
+                <th title="Wall thickness in mm">Wall</th>
+                <th title="Cut length in mm">Length</th>
+                <th title="Suspension hole distance from top end in mm">Susp.</th>
+              </tr>
+            </thead>
+            <tbody>
+              {tubes.map((t, i) => {
+                const g = tubeGeometry(config, i)
+                const susp_mm = t.length_mm * config.suspensionPoint
+                const matLabel = MATERIALS[g.material]?.label ?? g.material
+                const dia_mm = (g.Do * 1000).toFixed(1)
+                const wall_mm = g.solid ? 'solid' : (g.t * 1000).toFixed(2) + ' mm'
+                return (
+                  <tr key={i}>
+                    <td>
+                      <span className="mfg-idx">#{i + 1}</span>{' '}
+                      <span className="mfg-note">{t.note}</span>
+                    </td>
+                    <td className="mfg-mat" title={matLabel}>{matLabel}</td>
+                    <td className="mfg-num">{dia_mm} mm</td>
+                    <td className="mfg-num">{wall_mm}</td>
+                    <td className="mfg-num mfg-len">{t.length_mm.toFixed(1)} mm</td>
+                    <td className="mfg-num mfg-susp">{susp_mm.toFixed(1)} mm</td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
       </div>
       <div className="mfg-footer">
         <div className="mfg-hint">

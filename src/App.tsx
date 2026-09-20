@@ -31,7 +31,12 @@ export default function App() {
     <div className="app">
       <GithubBanner />
       <WindLines layer="back" />
-      <Canvas shadows gl={{ alpha: true, antialias: true }} camera={{ position: [1.4, 1.5, 2.2], fov: 45 }}>
+      <Canvas
+        shadows
+        gl={{ alpha: true, antialias: true }}
+        camera={{ position: [1.4, 1.5, 2.2], fov: 45 }}
+        onContextMenu={(e) => e.preventDefault()}
+      >
         <ChimeScene />
       </Canvas>
       <WindLines layer="front" />

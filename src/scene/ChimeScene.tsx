@@ -56,6 +56,7 @@ function TubeMesh({ index, dropY }: { index: number; dropY: number }) {
     <group ref={pivotRef} position={[x, -dropY - s, z]}>
       <mesh position={[0, s - L / 2, 0]} castShadow
         onPointerDown={(e) => {
+          if (e.button !== 0) return // only left-click strikes; right-click is reserved for panning
           e.stopPropagation()
           audio.init(); audio.resume()
           audio.strike(spec, 0.8, x * 4)
@@ -383,7 +384,7 @@ export function ChimeScene() {
         <Simulator />
       </group>
       <ContactShadows position={[0, -0.4, 0]} opacity={0.4} scale={4} blur={2.5} far={2} />
-      <OrbitControls target={[0, 1.2, 0]} enablePan={false} minDistance={0.8} maxDistance={6} />
+      <OrbitControls target={[0, 1.2, 0]} enablePan={true} screenSpacePanning={true} minDistance={0.8} maxDistance={6} />
     </>
   )
 }
