@@ -1,7 +1,8 @@
 import { useState, useRef, useLayoutEffect, useEffect } from 'react'
 import type { ChangeEvent } from 'react'
 import { createPortal } from 'react-dom'
-import { useStore, tubeSpec, maxDrop_mm, optimalDrop_mm, equalLoudnessDrop_mm, tubeGeometry, tubeSuspension, effectiveStrikerDimensions } from '../state/store'
+import { useStore, tubeSpec, maxDrop_mm, optimalDrop_mm, equalLoudnessDrop_mm, tubeGeometry, tubeSuspension, tubeMountingPosition, effectiveStrikerDimensions } from '../state/store'
+import type { TubeAlignment } from '../state/store'
 import { MATERIALS, STRIKER_MATERIALS, STRIKER_FORMS } from '../physics/materials'
 import { SCALES, MOODS, NOTE_NAMES } from '../physics/scales'
 import { tubeDecay } from '../physics/tubes'
@@ -210,6 +211,7 @@ type SectionId =
   | 'wind'
   | 'optics'
   | 'tubes'
+  | 'mounting'
   | 'tuning'
   | 'striker'
   | 'mfgOverview'
@@ -253,7 +255,9 @@ function AcousticsInfo({ tubeIndex }: { tubeIndex?: number | null }) {
   if (!tube) return null
   const spec = tubeSpec(config, tube, idx)
   const striker = { material: config.strikerMaterial, form: config.strikerForm, diameter_mm: config.strikerDiameter_mm, height_mm: config.strikerHeight_mm }
-  const xi = Math.max(0.02, Math.min(0.98, (config.strikerDrop_mm / 1000) / (tube.length_mm / 1000)))
+  const mount = tubeMountingPosition(config, tubes, idx)
+  const strikerY_mm = config.tubeDrop_mm + config.strikerDrop_mm
+  const xi = Math.max(0.02, Math.min(0.98, (strikerY_mm - mount.top_mm) / tube.length_mm))
   const q = strikeQuality(xi)
   const est = estimateStrike(spec, striker, 0.3, xi)
   const best = estimateStrike(spec, striker, 0.3, opt.xi)
@@ -348,6 +352,7 @@ export function Controls() {
     wind: true,
     optics: true,
     tubes: true,
+    mounting: true,
     tuning: true,
     striker: false,
     mfgOverview: true,
@@ -465,6 +470,9 @@ export function Controls() {
           <>
             <Section id="tubes" title="Tubes" open={open} toggle={toggle}>
               <TubesSection />
+            </Section>
+            <Section id="mounting" title="Mounting" open={open} toggle={toggle}>
+              <MountingSection />
             </Section>
             <Section id="tuning" title="Tuning" open={open} toggle={toggle}>
               <TuningSection />
@@ -849,7 +857,9 @@ function previewTube(i: number) {
   const { config, tubes } = useStore.getState()
   audio.init(); audio.resume()
   const a = (i / config.tubeCount) * Math.PI * 2
-  const xi = Math.max(0.02, Math.min(0.98, (config.strikerDrop_mm / 1000) / (tubes[i].length_mm / 1000)))
+  const mount = tubeMountingPosition(config, tubes, i)
+  const strikerY_mm = config.tubeDrop_mm + config.strikerDrop_mm
+  const xi = Math.max(0.02, Math.min(0.98, (strikerY_mm - mount.top_mm) / tubes[i].length_mm))
   const neighbours = tubes.filter((_, j) => j !== i).map((_, j2) => specOf(j2 < i ? j2 : j2 + 1))
   const spec = specOf(i)
   const f0 = tubeFrequencies(spec).f0
@@ -903,13 +913,42 @@ function OpticsSection() {
         value={config.plateRadius_mm * 2} onChange={(v) => setConfig({ plateRadius_mm: v / 2 })} />
       <ColorRow label="Plate color" value={config.plateColor}
         onChange={(c) => setConfig({ plateColor: c })} />
-      <Slider label="Tube offset" min={0} max={100} step={1} fmt={(v) => v + ' mm'} helpId="tubeOffset"
-        value={config.tubeDrop_mm} onChange={(v) => setConfig({ tubeDrop_mm: v })} />
       <Select label="Sail shape" value={config.sailType} helpId="sailShape"
         options={SAIL_TYPES as unknown as { id: string; label: string }[]}
         onChange={(v) => setConfig({ sailType: v })} />
       <ColorRow label="Sail color" value={config.sailColor}
         onChange={(c) => setConfig({ sailColor: c })} />
+    </>
+  )
+}
+
+const TUBE_ALIGNMENT_OPTIONS: { id: TubeAlignment; label: string }[] = [
+  { id: 'top', label: 'All starting at the same offset' },
+  { id: 'suspension', label: 'All aligned by suspension point' },
+  { id: 'centerStrike', label: 'All aligned by center strike' },
+]
+
+function MountingSection() {
+  const { config, setConfig } = useStore()
+  return (
+    <>
+      <Slider
+        label="Tube offset"
+        min={0}
+        max={100}
+        step={1}
+        fmt={(v) => v + ' mm'}
+        helpId="tubeOffset"
+        value={config.tubeDrop_mm}
+        onChange={(v) => setConfig({ tubeDrop_mm: v })}
+      />
+      <Select
+        label="Alignment"
+        value={config.tubeAlignment ?? 'top'}
+        helpId="tubeAlignment"
+        options={TUBE_ALIGNMENT_OPTIONS}
+        onChange={(v) => setConfig({ tubeAlignment: v as TubeAlignment })}
+      />
     </>
   )
 }
@@ -969,14 +1008,15 @@ function ManufacturingTab({
   }
 
   const copyCutList = () => {
-    const headers = ['Tube', 'Note', 'Material', 'Outer Ø (mm)', 'Wall (mm)', 'Length (mm)', 'Suspension Pos (mm from top)']
+    const headers = ['Tube', 'Note', 'Material', 'Outer Ø (mm)', 'Wall (mm)', 'Length (mm)', 'Suspension Pos (mm from top)', 'Dist. to Plate (mm)']
     const rows = tubes.map((t, i) => {
       const g = tubeGeometry(config, i)
       const susp = tubeSuspension(config, tubes, i)
+      const mount = tubeMountingPosition(config, tubes, i)
       const mat = MATERIALS[g.material]?.label ?? g.material
       const dia = (g.Do * 1000).toFixed(1)
       const wall = g.solid ? 'solid' : (g.t * 1000).toFixed(2)
-      return [i + 1, t.note, mat, dia, wall, t.length_mm.toFixed(1), susp.mm.toFixed(1)].join('\t')
+      return [i + 1, t.note, mat, dia, wall, t.length_mm.toFixed(1), susp.mm.toFixed(1), mount.top_mm.toFixed(1)].join('\t')
     })
     navigator.clipboard?.writeText([headers.join('\t'), ...rows].join('\n'))
     setCopied(true)
@@ -1169,12 +1209,14 @@ function ManufacturingTab({
                   <th title="Wall thickness in mm">Wall</th>
                   <th title="Cut length in mm">Length</th>
                   <th title="Suspension hole distance from top end in mm">Susp.</th>
+                  <th title="Distance from mounting plate to tube top in mm">Dist. to Plate</th>
                 </tr>
               </thead>
               <tbody>
                 {tubes.map((t, i) => {
                   const g = tubeGeometry(config, i)
                   const susp = tubeSuspension(config, tubes, i)
+                  const mount = tubeMountingPosition(config, tubes, i)
                   const matLabel = MATERIALS[g.material]?.label ?? g.material
                   const matFactor = config.materialSpeedFactors?.[g.material] ?? 1.0
                   const isCalib = Math.abs(matFactor - 1.0) > 0.0005
@@ -1220,6 +1262,12 @@ function ManufacturingTab({
                       <td className="mfg-num">{wall_mm}</td>
                       <td className="mfg-num mfg-len">{t.length_mm.toFixed(1)} mm</td>
                       <td className="mfg-num mfg-susp">{susp.mm.toFixed(1)} mm</td>
+                      <td
+                        className="mfg-num mfg-mount"
+                        title={`Distance to tube top: ${mount.top_mm.toFixed(1)} mm (${mount.susp_mm.toFixed(1)} mm to suspension hole)`}
+                      >
+                        {mount.top_mm.toFixed(1)} mm
+                      </td>
                     </tr>
                   )
                 })}
@@ -1576,9 +1624,21 @@ function ManufacturingTab({
         </div>
       </Section>
 
-      {/* ────────────────── Section 4: Striker STL Download ────────────────── */}
-      <Section id="mfgStriker" title="Striker STL Download" open={open} toggle={toggle}>
-        <div className="mfg-striker-card" style={{ marginTop: 0 }}>
+      {/* ────────────────── Section 4: Striker ────────────────── */}
+      <Section id="mfgStriker" title="Striker" open={open} toggle={toggle}>
+        <div className="mfg-striker-mount-card">
+          <div className="mfg-striker-mount-header">
+            <span className="mfg-mount-label">Distance from mounting plate:</span>
+            <strong className="mfg-mount-value">
+              {(config.tubeDrop_mm + config.strikerDrop_mm).toFixed(1)} mm
+            </strong>
+          </div>
+          <div className="mfg-mount-hint">
+            Hanging cord length to striker center • {(config.tubeDrop_mm + config.strikerDrop_mm - mfgStrikerDims.height_mm / 2).toFixed(1)} mm to top face
+          </div>
+        </div>
+
+        <div className="mfg-striker-card">
           <div className="mfg-striker-header">
             <div className="mfg-striker-title">
               <span>🖨️ Striker 3D Print / Fabrication (STL)</span>

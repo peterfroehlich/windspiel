@@ -163,6 +163,12 @@ export const HELP: Record<string, string> = {
     'then a gap, then the tubes). 0 = tubes touch the plate; larger values give an ' +
     'airy floating look. The striker/sail geometry follows automatically.',
 
+  tubeAlignment:
+    'Controls how the tubes are vertically aligned relative to the mounting plate: ' +
+    '"All starting at the same offset" aligns all tube tops at the configured offset; ' +
+    '"All aligned by suspension point" aligns all drill/suspension holes horizontally for uniform cord length; ' +
+    '"All aligned by center strike" centers each tube at its midpoint so the striker hits every tube at its fundamental antinode.',
+
   sailShape:
     'Shape of the wind catcher at the bottom. The physics only cares about its area ' +
     'and mass (set in the Wind section), so the shape is an aesthetic choice — but it ' +

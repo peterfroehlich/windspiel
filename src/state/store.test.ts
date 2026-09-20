@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { strikeWeights } from '../physics/modes'
-import { useStore, tubeSpec, maxDrop_mm, optimalDrop_mm, equalLoudnessDrop_mm, tubeSuspension, effectiveStrikerDimensions } from './store'
+import { useStore, tubeSpec, maxDrop_mm, optimalDrop_mm, equalLoudnessDrop_mm, tubeSuspension, tubeMountingPosition, effectiveStrikerDimensions } from './store'
 
 const st = () => useStore.getState()
 
@@ -261,4 +261,52 @@ describe('store: effectiveStrikerDimensions', () => {
     expect(dims.height_mm).toBe(33)
   })
 })
+
+describe('store: tubeMountingPosition', () => {
+  it('top alignment: all tubes start at exactly tubeDrop_mm', () => {
+    st().setConfig({ tubeDrop_mm: 35, tubeAlignment: 'top' })
+    const { config, tubes } = st()
+    tubes.forEach((_, i) => {
+      const pos = tubeMountingPosition(config, tubes, i)
+      expect(pos.top_mm).toBe(35)
+      expect(pos.susp_mm).toBeCloseTo(35 + tubeSuspension(config, tubes, i).mm, 5)
+      expect(pos.center_mm).toBeCloseTo(35 + tubes[i].length_mm / 2, 5)
+      expect(pos.bottom_mm).toBeCloseTo(35 + tubes[i].length_mm, 5)
+    })
+  })
+
+  it('suspension alignment: all tubes have the exact same suspension distance from plate', () => {
+    st().setConfig({ tubeDrop_mm: 40, tubeAlignment: 'suspension' })
+    const { config, tubes } = st()
+    const maxS = Math.max(...tubes.map((_, i) => tubeSuspension(config, tubes, i).mm))
+    const expectedCommonSusp = 40 + maxS
+
+    tubes.forEach((_, i) => {
+      const pos = tubeMountingPosition(config, tubes, i)
+      expect(pos.susp_mm).toBeCloseTo(expectedCommonSusp, 5)
+      expect(pos.top_mm).toBeGreaterThanOrEqual(40 - 1e-6)
+    })
+    // The tube with max suspension point starts at exactly tubeDrop_mm
+    const minTop = Math.min(...tubes.map((_, i) => tubeMountingPosition(config, tubes, i).top_mm))
+    expect(minTop).toBeCloseTo(40, 5)
+  })
+
+  it('center strike alignment: all tubes have the exact same midpoint elevation', () => {
+    st().setConfig({ tubeDrop_mm: 30, tubeAlignment: 'centerStrike' })
+    const { config, tubes } = st()
+    const maxL = Math.max(...tubes.map((t) => t.length_mm))
+    const expectedCenter = 30 + maxL / 2
+
+    tubes.forEach((_, i) => {
+      const pos = tubeMountingPosition(config, tubes, i)
+      expect(pos.center_mm).toBeCloseTo(expectedCenter, 5)
+      expect(pos.top_mm).toBeGreaterThanOrEqual(30 - 1e-6)
+      expect(pos.bottom_mm).toBeCloseTo(pos.top_mm + tubes[i].length_mm, 5)
+    })
+    // Longest tube starts at exactly tubeDrop_mm
+    const minTop = Math.min(...tubes.map((_, i) => tubeMountingPosition(config, tubes, i).top_mm))
+    expect(minTop).toBeCloseTo(30, 5)
+  })
+})
+
 

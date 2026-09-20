@@ -555,6 +555,10 @@ body { font-family: system-ui, sans-serif; color: #dfe3ea; }
   color: #6c8cff;
 }
 
+.mfg-mount {
+  color: #f0c674;
+}
+
 .mfg-footer {
   display: flex;
   justify-content: space-between;
@@ -1304,6 +1308,45 @@ body { font-family: system-ui, sans-serif; color: #dfe3ea; }
   color: #7b88a1;
   line-height: 1.35;
 }
+
+/* Manufacturing Striker Mounting Card */
+.mfg-striker-mount-card {
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: #141a27;
+  border: 1px solid #232f48;
+  margin-bottom: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.mfg-striker-mount-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.mfg-mount-label {
+  font-size: 11px;
+  color: #aeb8cc;
+  font-weight: 500;
+}
+
+.mfg-mount-value {
+  font-size: 13px;
+  font-weight: 700;
+  color: #f0c674;
+  font-family: ui-monospace, SFMono-Regular, monospace;
+}
+
+.mfg-mount-hint {
+  font-size: 9.5px;
+  color: #7b88a1;
+  line-height: 1.35;
+}
+
 
 
 

@@ -2,7 +2,7 @@ import { useRef, useMemo, useEffect } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { OrbitControls, Environment, ContactShadows } from '@react-three/drei'
 import * as THREE from 'three'
-import { useStore, tubeSpec, tubeGeometry, tubeSuspension, effectiveStrikerDimensions } from '../state/store'
+import { useStore, tubeSpec, tubeGeometry, tubeSuspension, tubeMountingPosition, effectiveStrikerDimensions } from '../state/store'
 import { MATERIALS, STRIKER_MATERIALS } from '../physics/materials'
 import { WindSim } from '../physics/wind'
 import { audio } from '../audio/engine'
@@ -11,7 +11,7 @@ import { tubeFrequencies } from '../physics/tubes'
 
 export const windSim = new WindSim()
 
-function TubeMesh({ index, dropY }: { index: number; dropY: number }) {
+function TubeMesh({ index }: { index: number }) {
   const { config, tubes } = useStore()
   const tube = tubes[index]
   const geo = tubeGeometry(config, index)
@@ -27,6 +27,9 @@ function TubeMesh({ index, dropY }: { index: number; dropY: number }) {
   const radius = geo.Do / 2
   const susp = tubeSuspension(config, tubes, index)
   const s = susp.mm / 1000            // pivot distance below tube top (m)
+  const mount = tubeMountingPosition(config, tubes, index)
+  const topY = mount.top_mm / 1000
+  const suspY = mount.susp_mm / 1000
   // compound pendulum about the pivot: ω = √(g·d / (L²/12 + d²)),
   // d = distance pivot → center of mass (a real physical wobble rate ~1 Hz)
   const d = L / 2 - s
@@ -63,13 +66,14 @@ function TubeMesh({ index, dropY }: { index: number; dropY: number }) {
   })
 
   return (
-    <group ref={pivotRef} position={[x, -dropY - s, z]}>
+    <group ref={pivotRef} position={[x, -suspY, z]}>
       <mesh position={[0, s - L / 2, 0]} castShadow
         onPointerDown={(e) => {
           if (e.button !== 0) return // only left-click strikes; right-click is reserved for panning
           e.stopPropagation()
           audio.init(); audio.resume()
-          const xi = Math.max(0.02, Math.min(0.98, (config.strikerDrop_mm / 1000) / (tube.length_mm / 1000)))
+          const strikerY = (config.tubeDrop_mm + config.strikerDrop_mm) / 1000
+          const xi = Math.max(0.02, Math.min(0.98, (strikerY - topY) / L))
           const neighbours = tubes.filter((_, j) => j !== index).map((t, j2) => tubeSpec(config, t, j2 < index ? j2 : j2 + 1))
           audio.strike(spec, 0.8, x * 4, xi, susp.fraction, neighbours)
           useStore.getState().flash(index, 0.8)
@@ -215,9 +219,11 @@ function Sail({ dropY }: { dropY: number }) {
   })
 
   // The wind catcher hangs on its own string from the striker and must clear
-  // the LONGEST tube — never sit beside/inside the tube forest.
-  const maxLen = Math.max(...tubes.map((t) => t.length_mm), 1) / 1000
-  const y = -(maxLen + 0.05 + 0.06)   // longest tube end + 5cm clearance + half sail height
+  // the lowest tube bottom end — never sit beside/inside the tube forest.
+  const maxBottom = tubes.length
+    ? Math.max(...tubes.map((_, i) => tubeMountingPosition(config, tubes, i).bottom_mm)) / 1000
+    : 0.5
+  const y = -(maxBottom + 0.05 + 0.06)   // lowest tube end + 5cm clearance + half sail height
   const geo = useMemo(() => {
     const g = new THREE.BufferGeometry()
     g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(6), 3))
@@ -264,7 +270,7 @@ function Sail({ dropY }: { dropY: number }) {
   )
 }
 
-function Strings({ dropY }: { dropY: number }) {
+function Strings() {
   const { config, tubes } = useStore()
   const tubeCount = config.tubeCount
   const ringR = config.suspensionRadius_mm / 1000
@@ -273,15 +279,15 @@ function Strings({ dropY }: { dropY: number }) {
     for (let i = 0; i < tubeCount; i++) {
       const a = (i / tubeCount) * Math.PI * 2
       const x = Math.cos(a) * ringR, z = Math.sin(a) * ringR
-      const susp = tubeSuspension(config, tubes, i)
-      const hang = susp.mm / 1000
+      const mount = tubeMountingPosition(config, tubes, i)
+      const hang = mount.susp_mm / 1000
       pts.push([x, 0, z, -hang])
     }
     return pts
   }, [tubeCount, ringR, config, tubes])
 
   return (
-    <group position={[0, -dropY, 0]}>
+    <group position={[0, 0, 0]}>
       {lines.map((p, i) => {
         const geo = new THREE.BufferGeometry().setFromPoints([
           new THREE.Vector3(p[0], 0, p[2]),
@@ -307,16 +313,19 @@ function Simulator() {
     const dt = Math.min(0.05, (now - last.current) / 1000)
     last.current = now
 
-    // sail length = distance striker → sail board (must clear longest tube)
-    const maxLen = Math.max(...tubes.map((t) => t.length_mm), 1) / 1000
-    const sailLen = (maxLen + 0.11) - config.strikerDrop_mm / 1000
+    // sail length = distance striker → sail board (must clear lowest tube end)
+    const strikerY = (config.tubeDrop_mm + config.strikerDrop_mm) / 1000
+    const maxBottom = tubes.length
+      ? Math.max(...tubes.map((_, i) => tubeMountingPosition(config, tubes, i).bottom_mm)) / 1000
+      : 0.5
+    const sailLen = (maxBottom + 0.11) - strikerY
     const strikerDims = effectiveStrikerDimensions(config, tubes)
     windSim.setGeometry(
       config.tubeCount,
       config.suspensionRadius_mm / 1000,
       config.outerDiameter_mm / 2000,
       strikerDims.diameter_mm / 2000,
-      (config.strikerDrop_mm + 60) / 1000,
+      strikerY,
       Math.max(0.1, sailLen),
       config.sailMass_g
     )
@@ -336,8 +345,11 @@ function Simulator() {
       const spec = tubeSpec(config, tubes[tube], tube)
       const a = (tube / config.tubeCount) * Math.PI * 2
       const pan = Math.cos(a) * 0.7
-      // strike position along tube: striker hangs strikerDrop below tube tops
-      const xi = Math.max(0.02, Math.min(0.98, (config.strikerDrop_mm / 1000) / (tubes[tube].length_mm / 1000)))
+      const mount = tubeMountingPosition(config, tubes, tube)
+      const strikerY = (config.tubeDrop_mm + config.strikerDrop_mm) / 1000
+      const topY = mount.top_mm / 1000
+      const L = tubes[tube].length_mm / 1000
+      const xi = Math.max(0.02, Math.min(0.98, (strikerY - topY) / L))
       audio.init()          // safety: strikes can fire before first gesture
       // Sympathetic tube coupling is always active
       const neighbours = tubes
@@ -365,12 +377,18 @@ function Simulator() {
 function TopPlate() {
   const { config } = useStore()
   const R = config.plateRadius_mm / 1000
-  const mat = <meshStandardMaterial color={config.plateColor} roughness={0.7} metalness={0.1} />
+  const mat = <meshStandardMaterial color={config.plateColor} roughness={0.4} metalness={0.1} />
   switch (config.plateShape) {
-    case 'ring':      // ring with open center, lying flat (torus is XY-native)
-      return <mesh position={[0, R * 0.16, 0]} rotation={[Math.PI / 2, 0, 0]} castShadow>
-        <torusGeometry args={[R * 0.85, R * 0.16, 16, 48]} />{mat}
+    case 'ring': {
+      const shape = new THREE.Shape()
+      shape.absarc(0, 0, R, 0, Math.PI * 2, false)
+      const hole = new THREE.Path()
+      hole.absarc(0, 0, R * 0.35, 0, Math.PI * 2, true)
+      shape.holes.push(hole)
+      return <mesh position={[0, 0.005, 0]} castShadow rotation={[-Math.PI / 2, 0, 0]}>
+        <extrudeGeometry args={[shape, { depth: 0.02, bevelEnabled: false }]} />{mat}
       </mesh>
+    }
     case 'octagon': {
       const s = new THREE.Shape()
       for (let k = 0; k < 8; k++) {
@@ -407,10 +425,10 @@ export function ChimeScene() {
       <Environment preset="city" />
       <group position={[0, 1.6, 0]}>
         <TopPlate />
-        {Array.from({ length: config.tubeCount }, (_, i) => <TubeMesh key={i} index={i} dropY={dropY} />)}
+        {Array.from({ length: config.tubeCount }, (_, i) => <TubeMesh key={i} index={i} />)}
         <Striker dropY={dropY} />
         <Sail dropY={dropY} />
-        <Strings dropY={dropY} />
+        <Strings />
         <Simulator />
       </group>
       <ContactShadows position={[0, -0.4, 0]} opacity={0.4} scale={4} blur={2.5} far={2} />

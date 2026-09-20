@@ -54,9 +54,12 @@ export interface ChimeConfig {
   plateRadius_mm: number
   plateColor: string
   tubeDrop_mm: number           // how far below the plate the tubes start
+  tubeAlignment?: TubeAlignment // alignment: top offset | suspension point | center strike
   sailType: string              // rectangle | diamond | circle | teardrop | feather
   sailColor: string
 }
+
+export type TubeAlignment = 'top' | 'suspension' | 'centerStrike'
 
 export const DEFAULT_CONFIG: ChimeConfig = {
   tubeCount: 6,
@@ -88,6 +91,7 @@ export const DEFAULT_CONFIG: ChimeConfig = {
   plateRadius_mm: 90,
   plateColor: '#3a2f24',
   tubeDrop_mm: 30,
+  tubeAlignment: 'top',
   sailType: 'rectangle',
   sailColor: '#8b3a3a',
   gustFrequency: 0.15,
@@ -231,6 +235,68 @@ export function tubeSuspension(
   const fraction = config.suspensionPoint
   return { fraction, mm: fraction * L_mm }
 }
+
+export interface TubeMountingPosition {
+  top_mm: number       // distance from mounting plate to tube top end
+  susp_mm: number      // distance from mounting plate to suspension hole (cord length)
+  center_mm: number    // distance from mounting plate to tube midpoint (strike center)
+  bottom_mm: number    // distance from mounting plate to tube bottom end
+}
+
+/** Resolve a tube's mounting position relative to the mounting plate based on alignment mode. */
+export function tubeMountingPosition(
+  config: ChimeConfig,
+  tubes: TubeConfig[],
+  index: number
+): TubeMountingPosition {
+  const alignment = config.tubeAlignment ?? 'top'
+  const drop = config.tubeDrop_mm
+  const tube = tubes[index]
+  const L = tube ? tube.length_mm : 300
+  const s = tubeSuspension(config, tubes, index).mm
+
+  if (alignment === 'suspension') {
+    // All tubes aligned by suspension point:
+    // Suspension holes share the same distance below the plate (uniform string length).
+    // Longest tube (largest s) starts at drop below the plate.
+    const maxS = tubes.length
+      ? Math.max(...tubes.map((_, i) => tubeSuspension(config, tubes, i).mm))
+      : s
+    const commonSusp_mm = drop + maxS
+    const top_mm = commonSusp_mm - s
+    return {
+      top_mm,
+      susp_mm: commonSusp_mm,
+      center_mm: top_mm + L / 2,
+      bottom_mm: top_mm + L,
+    }
+  }
+
+  if (alignment === 'centerStrike') {
+    // All tubes aligned by center strike:
+    // Tube midpoints share the same elevation below the plate.
+    // Longest tube (largest L / 2) starts at drop below the plate.
+    const maxL = tubes.length ? Math.max(...tubes.map((t) => t.length_mm)) : L
+    const commonCenter_mm = drop + maxL / 2
+    const top_mm = commonCenter_mm - L / 2
+    return {
+      top_mm,
+      susp_mm: top_mm + s,
+      center_mm: commonCenter_mm,
+      bottom_mm: top_mm + L,
+    }
+  }
+
+  // Default: 'top' - all starting at the same offset
+  const top_mm = drop
+  return {
+    top_mm,
+    susp_mm: top_mm + s,
+    center_mm: top_mm + L / 2,
+    bottom_mm: top_mm + L,
+  }
+}
+
 
 function computeTubes(c: ChimeConfig): TubeConfig[] {
   const out: TubeConfig[] = []
