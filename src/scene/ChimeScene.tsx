@@ -2,7 +2,7 @@ import { useRef, useMemo, useEffect } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { OrbitControls, Environment, ContactShadows } from '@react-three/drei'
 import * as THREE from 'three'
-import { useStore, tubeSpec, tubeGeometry, tubeSuspension } from '../state/store'
+import { useStore, tubeSpec, tubeGeometry, tubeSuspension, effectiveStrikerDimensions } from '../state/store'
 import { MATERIALS, STRIKER_MATERIALS } from '../physics/materials'
 import { WindSim } from '../physics/wind'
 import { audio } from '../audio/engine'
@@ -96,10 +96,14 @@ function TubeMesh({ index, dropY }: { index: number; dropY: number }) {
 }
 
 function Striker({ dropY }: { dropY: number }) {
-  const { config } = useStore()
+  const { config, tubes } = useStore()
   const mat = STRIKER_MATERIALS[config.strikerMaterial]
   const ref = useRef<THREE.Group>(null)
   const wind = windSim.state
+  const strikerDims = effectiveStrikerDimensions(config, tubes)
+  const halfH = strikerDims.height_mm / 2000
+  const R = strikerDims.diameter_mm / 2000
+  const h = strikerDims.height_mm / 1000
 
   // hanging string: top plate → striker top, tracking the swing
   const hangGeo = useMemo(() => {
@@ -122,7 +126,6 @@ function Striker({ dropY }: { dropY: number }) {
     const yStriker = -dropY - config.strikerDrop_mm / 1000
     const tiltZ = -wind.x * 2.0, tiltX = wind.z * 2.0
     // top point of the tilted striker disc, in world coords
-    const halfH = config.strikerHeight_mm / 2000
     const topLocal = new THREE.Vector3(0, halfH, 0)
       .applyEuler(new THREE.Euler(tiltX, 0, tiltZ))
       .add(new THREE.Vector3(wind.x, yStriker, wind.z))
@@ -133,8 +136,6 @@ function Striker({ dropY }: { dropY: number }) {
 
   const y = -dropY - config.strikerDrop_mm / 1000
   // striker geometry follows the selected contact form
-  const R = config.strikerDiameter_mm / 2000
-  const h = config.strikerHeight_mm / 1000
   const strikeMat = (
     <meshStandardMaterial color={mat.color} roughness={mat.roughness} metalness={config.strikerMaterial === 'metal' ? 0.9 : 0.05} />
   )
@@ -198,8 +199,9 @@ function Sail({ dropY }: { dropY: number }) {
     // string from striker bottom to sail top, tracking both
     if (stringRef.current) {
       const pos = stringRef.current.geometry.attributes.position as THREE.BufferAttribute
+      const strikerDims = effectiveStrikerDimensions(config, tubes)
       const strikerY = -dropY - config.strikerDrop_mm / 1000
-      const yTop = strikerY - config.strikerHeight_mm / 2000
+      const yTop = strikerY - strikerDims.height_mm / 2000
       pos.setXYZ(0, wind.x, yTop, wind.z)
       pos.setXYZ(1, wind.sailX, ref.current!.position.y + 0.06, wind.sailZ)
       pos.needsUpdate = true
@@ -302,11 +304,12 @@ function Simulator() {
     // sail length = distance striker → sail board (must clear longest tube)
     const maxLen = Math.max(...tubes.map((t) => t.length_mm), 1) / 1000
     const sailLen = (maxLen + 0.11) - config.strikerDrop_mm / 1000
+    const strikerDims = effectiveStrikerDimensions(config, tubes)
     windSim.setGeometry(
       config.tubeCount,
       config.suspensionRadius_mm / 1000,
       config.outerDiameter_mm / 2000,
-      config.strikerDiameter_mm / 2000,
+      strikerDims.diameter_mm / 2000,
       (config.strikerDrop_mm + 60) / 1000,
       Math.max(0.1, sailLen),
       config.sailMass_g
@@ -335,9 +338,10 @@ function Simulator() {
         .filter((_, j) => j !== tube)
         .map((t, j2) => tubeSpec(config, t, j2 < tube ? j2 : j2 + 1))
       // Hertzian contact: partial excitation through the contact-time low-pass
+      const currentStrikerDims = effectiveStrikerDimensions(config, tubes)
       const striker = {
         material: config.strikerMaterial, form: config.strikerForm,
-        diameter_mm: config.strikerDiameter_mm, height_mm: config.strikerHeight_mm,
+        diameter_mm: currentStrikerDims.diameter_mm, height_mm: currentStrikerDims.height_mm,
       }
       const vImp = Math.max(0.02, vel * 0.15)   // normalized vel → m/s (sim regime)
       const f0 = tubeFrequencies(spec).f0

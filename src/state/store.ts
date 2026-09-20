@@ -3,6 +3,7 @@ import { MATERIALS } from '../physics/materials'
 import { SCALES, scaleFrequencies } from '../physics/scales'
 import { lengthForFrequency, noteToFreq, TubeSpec, tubeFrequencies, tubeDecay } from '../physics/tubes'
 import { strikeWeights } from '../physics/modes'
+import { optimalStrikerMass, solveStrikerHeight_mm, calculateStrikerDiameter_mm } from '../physics/contact'
 
 export interface TubeConfig {
   note: string
@@ -41,6 +42,8 @@ export interface ChimeConfig {
   strikerDiameter_mm: number
   strikerHeight_mm: number
   strikerForm: string            // disc | sphere | donut | cylinder (Hertzian contact)
+  strikerMode?: 'auto' | 'manual' // automatic sizing vs manual dimensions
+  strikerDistanceToTube_mm?: number // clearance gap in auto mode (default: 15 mm)
   strikerDrop_mm: number        // top of striker below tube tops
   windStrength: number          // 0..1
   gustFrequency: number         // gusts per second
@@ -76,6 +79,8 @@ export const DEFAULT_CONFIG: ChimeConfig = {
   strikerDiameter_mm: 55,
   strikerHeight_mm: 25,
   strikerForm: 'sphere',
+  strikerMode: 'auto',
+  strikerDistanceToTube_mm: 15,
   strikerDrop_mm: 0,   // replaced below: optimal center-strike of default tuning
   windStrength: 0.35,
   sailMass_g: 30,
@@ -146,6 +151,49 @@ export function tubeSpec(config: ChimeConfig, tube: TubeConfig, index = 0): Tube
     material: g.material,
     speedFactor,
   }
+}
+
+/** Resolve striker diameter and height: manual mode uses configured dimensions; auto mode sizes diameter from tube distance and thickness from optimal mass. */
+export function effectiveStrikerDimensions(
+  config: ChimeConfig,
+  tubes: TubeConfig[]
+): { diameter_mm: number; height_mm: number } {
+  if (config.strikerMode === 'manual') {
+    return {
+      diameter_mm: config.strikerDiameter_mm,
+      height_mm: config.strikerHeight_mm,
+    }
+  }
+
+  const longestTube = tubes.length
+    ? tubes.reduce((max, t) => (t.length_mm > max.length_mm ? t : max), tubes[0])
+    : undefined
+  const longestIdx = longestTube ? tubes.indexOf(longestTube) : 0
+  const refGeom = tubeGeometry(config, longestIdx)
+  const dist = config.strikerDistanceToTube_mm ?? 15
+  const diameter_mm = calculateStrikerDiameter_mm(
+    config.suspensionRadius_mm,
+    refGeom.Do * 1000,
+    dist
+  )
+
+  const refSpec = longestTube
+    ? tubeSpec(config, longestTube, longestIdx)
+    : {
+        length: 0.4,
+        outerDiameter: config.outerDiameter_mm / 1000,
+        wallThickness: config.wallThickness_mm / 1000,
+        material: config.material,
+      }
+  const targetMass_kg = optimalStrikerMass(refSpec)
+  const height_mm = solveStrikerHeight_mm(
+    targetMass_kg,
+    config.strikerMaterial,
+    config.strikerForm,
+    diameter_mm
+  )
+
+  return { diameter_mm, height_mm }
 }
 
 /** Resolve a tube's effective suspension point (fraction and absolute mm from top). */

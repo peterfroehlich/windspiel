@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { strikeWeights } from '../physics/modes'
-import { useStore, tubeSpec, maxDrop_mm, optimalDrop_mm, equalLoudnessDrop_mm, tubeSuspension } from './store'
+import { useStore, tubeSpec, maxDrop_mm, optimalDrop_mm, equalLoudnessDrop_mm, tubeSuspension, effectiveStrikerDimensions } from './store'
 
 const st = () => useStore.getState()
 
@@ -227,6 +227,38 @@ describe('store: materialSpeedFactors calibration', () => {
 
     expect(st().tubes[0].length_mm).toBeLessThan(aluBefore)
     expect(st().tubes[1].length_mm).toBeCloseTo(brassBefore, 4)
+  })
+})
+
+describe('store: effectiveStrikerDimensions', () => {
+  it('automatic mode sizes diameter from distance to tube and thickness from optimal mass', () => {
+    st().setConfig({
+      strikerMode: 'auto',
+      strikerDistanceToTube_mm: 15,
+      suspensionRadius_mm: 55,
+      outerDiameter_mm: 25,
+    })
+    const dims = effectiveStrikerDimensions(st().config, st().tubes)
+    // 55 - 12.5 - 15 = 27.5 -> dia = 55
+    expect(dims.diameter_mm).toBe(55)
+    expect(dims.height_mm).toBeGreaterThanOrEqual(8)
+    expect(dims.height_mm).toBeLessThanOrEqual(60)
+
+    // Changing distance to tube updates diameter
+    st().setConfig({ strikerDistanceToTube_mm: 10 })
+    const dims10 = effectiveStrikerDimensions(st().config, st().tubes)
+    expect(dims10.diameter_mm).toBe(65)
+  })
+
+  it('manual mode respects manual diameter and height values', () => {
+    st().setConfig({
+      strikerMode: 'manual',
+      strikerDiameter_mm: 72,
+      strikerHeight_mm: 33,
+    })
+    const dims = effectiveStrikerDimensions(st().config, st().tubes)
+    expect(dims.diameter_mm).toBe(72)
+    expect(dims.height_mm).toBe(33)
   })
 })
 

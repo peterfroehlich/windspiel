@@ -1,7 +1,7 @@
 import { useState, useRef, useLayoutEffect, useEffect } from 'react'
 import type { ChangeEvent } from 'react'
 import { createPortal } from 'react-dom'
-import { useStore, tubeSpec, maxDrop_mm, optimalDrop_mm, equalLoudnessDrop_mm, tubeGeometry, tubeSuspension } from '../state/store'
+import { useStore, tubeSpec, maxDrop_mm, optimalDrop_mm, equalLoudnessDrop_mm, tubeGeometry, tubeSuspension, effectiveStrikerDimensions } from '../state/store'
 import { MATERIALS, STRIKER_MATERIALS, STRIKER_FORMS } from '../physics/materials'
 import { SCALES, MOODS, NOTE_NAMES } from '../physics/scales'
 import { tubeDecay } from '../physics/tubes'
@@ -16,6 +16,7 @@ import { DEFAULT_CONFIG } from '../state/store'
 import { listPresets as presetsList, savePreset, loadPreset, deletePreset } from '../state/presets'
 import { estimateCut, freqToNote, calculateMaterialCalibration } from '../physics/tuning'
 import { AudioPitchTracker } from '../audio/pitchDetector'
+import { downloadStrikerSTL } from '../physics/stlExport'
 
 
 /** Config keys accepted on import (subset check against foreign JSON). */
@@ -203,7 +204,17 @@ function specOf(i: number) {
   return tubeSpec(config, tubes[i], i)
 }
 
-type SectionId = 'tubes' | 'tuning' | 'striker' | 'wind' | 'optics' | 'manufacturing'
+type MainTab = 'simulation' | 'design' | 'manufacturing'
+
+type SectionId =
+  | 'wind'
+  | 'optics'
+  | 'tubes'
+  | 'tuning'
+  | 'striker'
+  | 'mfgOverview'
+  | 'mfgTuning'
+  | 'mfgCalibration'
 
 /** Collapsible sidebar section. Multiple sections can be open at once and the
  *  sidebar scrolls. Folded sections unmount (cheap) — all values are derived
@@ -327,9 +338,20 @@ export function Controls() {
     a.click()
   }
 
-  // default: Tubes + Tuning open; everything else folded; multi-open, scrollable
+  const [mainTab, setMainTab] = useState<MainTab>('simulation')
+
+  // default: Simulation has Wind and Optics open (both expanded);
+  // Design has Tubes and Tuning open, Striker folded;
+  // Manufacturing has Overview, Tuning Tool, and Calibration Tool open.
   const [open, setOpen] = useState<Record<SectionId, boolean>>({
-    tubes: true, striker: false, wind: false, tuning: true, optics: false, manufacturing: false,
+    wind: true,
+    optics: true,
+    tubes: true,
+    tuning: true,
+    striker: false,
+    mfgOverview: true,
+    mfgTuning: true,
+    mfgCalibration: true,
   })
   const toggle = (id: SectionId) => setOpen((o) => ({ ...o, [id]: !o[id] }))
 
@@ -396,25 +418,63 @@ export function Controls() {
       </div>
       {physicsOpen && <PhysicsModal onClose={() => setPhysicsOpen(false)} />}
 
+      <div className="main-tabs" role="tablist" aria-label="Configuration tabs">
+        <button
+          type="button"
+          role="tab"
+          aria-selected={mainTab === 'simulation'}
+          className={`main-tab ${mainTab === 'simulation' ? 'active' : ''}`}
+          onClick={() => setMainTab('simulation')}
+        >
+          Simulation
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={mainTab === 'design'}
+          className={`main-tab ${mainTab === 'design' ? 'active' : ''}`}
+          onClick={() => setMainTab('design')}
+        >
+          Design
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={mainTab === 'manufacturing'}
+          className={`main-tab ${mainTab === 'manufacturing' ? 'active' : ''}`}
+          onClick={() => setMainTab('manufacturing')}
+        >
+          Manufacturing
+        </button>
+      </div>
+
       <div className="sections">
-        <Section id="tubes" title="Tubes" open={open} toggle={toggle}>
-          <TubesSection />
-        </Section>
-        <Section id="tuning" title="Tuning" open={open} toggle={toggle}>
-          <TuningSection />
-        </Section>
-        <Section id="striker" title="Striker" open={open} toggle={toggle}>
-          <StrikerSection />
-        </Section>
-        <Section id="wind" title="Wind" open={open} toggle={toggle}>
-          <WindSection />
-        </Section>
-        <Section id="optics" title="Optics" open={open} toggle={toggle}>
-          <OpticsSection />
-        </Section>
-        <Section id="manufacturing" title="Manufacturing" open={open} toggle={toggle}>
-          <ManufacturingSection />
-        </Section>
+        {mainTab === 'simulation' && (
+          <>
+            <Section id="wind" title="Wind" open={open} toggle={toggle}>
+              <WindSection />
+            </Section>
+            <Section id="optics" title="Optics" open={open} toggle={toggle}>
+              <OpticsSection />
+            </Section>
+          </>
+        )}
+        {mainTab === 'design' && (
+          <>
+            <Section id="tubes" title="Tubes" open={open} toggle={toggle}>
+              <TubesSection />
+            </Section>
+            <Section id="tuning" title="Tuning" open={open} toggle={toggle}>
+              <TuningSection />
+            </Section>
+            <Section id="striker" title="Striker" open={open} toggle={toggle}>
+              <StrikerSection />
+            </Section>
+          </>
+        )}
+        {mainTab === 'manufacturing' && (
+          <ManufacturingTab open={open} toggle={toggle} />
+        )}
       </div>
     </div>
   )
@@ -624,19 +684,105 @@ function TuningSection() {
 
 function StrikerSection() {
   const { config, tubes, setConfig } = useStore()
-  const refSpec = tubeSpec(config, tubes[0], 0)
+  const isAuto = (config.strikerMode ?? 'auto') === 'auto'
+  const strikerDims = effectiveStrikerDimensions(config, tubes)
+  const longestTube = tubes.length
+    ? tubes.reduce((max, t) => (t.length_mm > max.length_mm ? t : max), tubes[0])
+    : undefined
+  const longestIdx = longestTube ? tubes.indexOf(longestTube) : 0
+  const refSpec = longestTube ? tubeSpec(config, longestTube, longestIdx) : tubeSpec(config, tubes[0], 0)
   const optimal = optimalStrikerMass(refSpec) * 1000
-  const current = strikerMass({ material: config.strikerMaterial, form: config.strikerForm, diameter_mm: config.strikerDiameter_mm, height_mm: config.strikerHeight_mm }) * 1000
+  const current = strikerMass({
+    material: config.strikerMaterial,
+    form: config.strikerForm,
+    diameter_mm: strikerDims.diameter_mm,
+    height_mm: strikerDims.height_mm,
+  }) * 1000
+
   return (
     <>
-      <Select label="Material" value={config.strikerMaterial} helpId="strikerMaterial"
+      <div className="striker-mode-toggle">
+        <button
+          type="button"
+          className={`striker-mode-btn ${isAuto ? 'active' : ''}`}
+          onClick={() => setConfig({ strikerMode: 'auto' })}
+        >
+          Automatic
+        </button>
+        <button
+          type="button"
+          className={`striker-mode-btn ${!isAuto ? 'active' : ''}`}
+          onClick={() => {
+            setConfig({
+              strikerMode: 'manual',
+              strikerDiameter_mm: strikerDims.diameter_mm,
+              strikerHeight_mm: strikerDims.height_mm,
+            })
+          }}
+        >
+          Manual
+        </button>
+      </div>
+
+      <Select
+        label="Material"
+        value={config.strikerMaterial}
+        helpId="strikerMaterial"
         options={Object.values(STRIKER_MATERIALS)}
-        onChange={(v) => setConfig({ strikerMaterial: v })} />
-      <Select label="Form" value={config.strikerForm} helpId="strikerForm"
+        onChange={(v) => setConfig({ strikerMaterial: v })}
+      />
+      <Select
+        label="Form"
+        value={config.strikerForm}
+        helpId="strikerForm"
         options={Object.values(STRIKER_FORMS)}
-        onChange={(v) => setConfig({ strikerForm: v })} />
-      <Slider label="Striker Ø" min={25} max={100} step={1} fmt={(v) => v + ' mm'} helpId="strikerDiameter"
-        value={config.strikerDiameter_mm} onChange={(v) => setConfig({ strikerDiameter_mm: v })} />
+        onChange={(v) => setConfig({ strikerForm: v })}
+      />
+
+      {isAuto ? (
+        <>
+          <Slider
+            label="Distance to tube"
+            min={4}
+            max={40}
+            step={1}
+            fmt={(v) => v + ' mm'}
+            helpId="strikerDistance"
+            value={config.strikerDistanceToTube_mm ?? 15}
+            onChange={(v) => setConfig({ strikerDistanceToTube_mm: v })}
+          />
+          <div className="striker-auto-badge">
+            <span>
+              Auto-size: <strong>Ø {strikerDims.diameter_mm} mm</strong> × <strong>{strikerDims.height_mm} mm</strong>
+            </span>
+            <span className="striker-auto-tag">◎ fitted to weight</span>
+          </div>
+        </>
+      ) : (
+        <>
+          <Slider
+            label="Striker Ø"
+            min={25}
+            max={100}
+            step={1}
+            fmt={(v) => v + ' mm'}
+            helpId="strikerDiameter"
+            value={config.strikerDiameter_mm}
+            onChange={(v) => setConfig({ strikerDiameter_mm: v })}
+          />
+          <Slider
+            label="Thickness"
+            min={8}
+            max={60}
+            step={1}
+            fmt={(v) => v + ' mm'}
+            helpId="strikerHeight"
+            value={config.strikerHeight_mm}
+            onChange={(v) => setConfig({ strikerHeight_mm: v })}
+          />
+        </>
+      )}
+
       <div className="row">
         <span className="label">Mass</span>
         <Help
@@ -657,15 +803,21 @@ function StrikerSection() {
           {current.toFixed(0)} g <span className="opt-tag">◎ optimal ≈ {optimal.toFixed(0)} g</span>
         </span>
       </div>
-      <Slider label="Thickness" min={8} max={60} step={1} fmt={(v) => v + ' mm'} helpId="strikerHeight"
-        value={config.strikerHeight_mm} onChange={(v) => setConfig({ strikerHeight_mm: v })} />
-      <Slider label="Drop" min={20} max={maxDrop_mm(tubes)} step={1} fmt={(v) => v + ' mm'} helpId="strikerDrop"
+
+      <Slider
+        label="Drop"
+        min={20}
+        max={maxDrop_mm(tubes)}
+        step={1}
+        fmt={(v) => v + ' mm'}
+        helpId="strikerDrop"
         value={Math.min(config.strikerDrop_mm, maxDrop_mm(tubes))}
         onChange={(v) => setConfig({ strikerDrop_mm: v })}
         marker={optimalDrop_mm(tubes)}
         markerLabel="◎ optimal center-strike (50% of longest tube)"
         marker2={equalLoudnessDrop_mm(tubes, config.suspensionPoint)}
-        marker2Label="◎ drop where all tubes sound most equally loud" />
+        marker2Label="◎ drop where all tubes sound most equally loud"
+      />
       <div className="marker-legend">
         <span className="legend-item"><i className="dot green" /> best tone (center-strike)</span>
         <span className="legend-item"><i className="dot amber" /> equal loudness</span>
@@ -762,7 +914,13 @@ function OpticsSection() {
 
 /* ───────────────────────── Manufacturing ───────────────────────── */
 
-function ManufacturingSection() {
+function ManufacturingTab({
+  open,
+  toggle,
+}: {
+  open: Record<SectionId, boolean>
+  toggle: (id: SectionId) => void
+}) {
   const { config, tubes, setWindOn, setConfig } = useStore()
   const [copied, setCopied] = useState(false)
   const wrapRef = useRef<HTMLDivElement>(null)
@@ -778,6 +936,8 @@ function ManufacturingSection() {
   const [manualFreqInput, setManualFreqInput] = useState<string>('')
   const [customLengthInput, setCustomLengthInput] = useState<string>('')
   const [micError, setMicError] = useState<string | null>(null)
+  const [stlExported, setStlExported] = useState(false)
+  const [cordHoleMm, setCordHoleMm] = useState('3.5')
 
   const trackerRef = useRef<AudioPitchTracker | null>(null)
 
@@ -930,6 +1090,39 @@ function ManufacturingSection() {
   const cutEstimate = estimateCut(measuredFreq, targetFreq, currentLength_mm)
   const noteInfo = freqToNote(measuredFreq)
 
+  // Striker manufacturing properties
+  const mfgStrikerDims = effectiveStrikerDimensions(config, tubes)
+  const mfgStrikerMat = STRIKER_MATERIALS[config.strikerMaterial]?.label ?? config.strikerMaterial
+  const mfgStrikerForm = STRIKER_FORMS[config.strikerForm]?.label ?? config.strikerForm
+  const mfgLongestTube = tubes.length
+    ? tubes.reduce((max, t) => (t.length_mm > max.length_mm ? t : max), tubes[0])
+    : undefined
+  const mfgLongestIdx = mfgLongestTube ? tubes.indexOf(mfgLongestTube) : 0
+  const mfgRefSpec = mfgLongestTube
+    ? tubeSpec(config, mfgLongestTube, mfgLongestIdx)
+    : tubeSpec(config, tubes[0], 0)
+  const mfgOptimalMass = optimalStrikerMass(mfgRefSpec) * 1000
+  const mfgCurrentMass =
+    strikerMass({
+      material: config.strikerMaterial,
+      form: config.strikerForm,
+      diameter_mm: mfgStrikerDims.diameter_mm,
+      height_mm: mfgStrikerDims.height_mm,
+    }) * 1000
+
+  const handleDownloadSTL = () => {
+    const holeDia = parseFloat(cordHoleMm) > 0 ? parseFloat(cordHoleMm) : 3.5
+    downloadStrikerSTL({
+      form: config.strikerForm,
+      diameter_mm: mfgStrikerDims.diameter_mm,
+      height_mm: mfgStrikerDims.height_mm,
+      material: config.strikerMaterial,
+      holeDiameter_mm: holeDia,
+    })
+    setStlExported(true)
+    setTimeout(() => setStlExported(false), 2500)
+  }
+
   // Calculate new suspension hole position
   const newLength_mm = cutEstimate.targetLength_mm
   const newSusp_mm = config.sameAbsoluteSuspension
@@ -950,343 +1143,404 @@ function ManufacturingSection() {
       : '#ff8a65' // sharp (too short)
 
   return (
-    <div className="mfg-section">
-      <div className="mfg-container">
-        {canScrollLeft && (
-          <button className="mfg-scroll-hint left" onClick={scrollLeft} title="Scroll left">
-            ‹
-          </button>
-        )}
-        {canScrollRight && (
-          <button className="mfg-scroll-hint right" onClick={scrollRight} title="Scroll right for suspension position">
-            <span>more ›</span>
-          </button>
-        )}
-        <div className="mfg-table-wrap" ref={wrapRef} onScroll={checkScroll}>
-          <table className="mfg-table">
-            <thead>
-              <tr>
-                <th title="Tube index & note">Tube</th>
-                <th title="Tube material">Material</th>
-                <th title="Outer diameter in mm">Ø</th>
-                <th title="Wall thickness in mm">Wall</th>
-                <th title="Cut length in mm">Length</th>
-                <th title="Suspension hole distance from top end in mm">Susp.</th>
-              </tr>
-            </thead>
-            <tbody>
-              {tubes.map((t, i) => {
-                const g = tubeGeometry(config, i)
-                const susp = tubeSuspension(config, tubes, i)
-                const matLabel = MATERIALS[g.material]?.label ?? g.material
-                const matFactor = config.materialSpeedFactors?.[g.material] ?? 1.0
-                const isCalib = Math.abs(matFactor - 1.0) > 0.0005
-                const dia_mm = (g.Do * 1000).toFixed(1)
-                const wall_mm = g.solid ? 'solid' : (g.t * 1000).toFixed(2) + ' mm'
-                const isSelected = activeIdx === i
-                return (
-                  <tr
-                    key={i}
-                    className={isSelected ? 'mfg-row-active' : ''}
-                    onClick={() => {
-                      setSelectedTubeIndex(i)
-                      setCapturedFreq(null)
-                      setManualFreqInput('')
-                      setCustomLengthInput('')
-                    }}
-                    title={`Click to select Tube #${i + 1} (${t.note}) for tuning analysis`}
-                  >
-                    <td>
-                      <span className="mfg-idx">#{i + 1}</span>{' '}
-                      <span className="mfg-note">{t.note}</span>
-                    </td>
-                    <td
-                      className="mfg-mat"
-                      title={
-                        matLabel +
-                        (isCalib
-                          ? ` (Calibrated: ${(Math.sqrt(matFactor) * 100).toFixed(1)}% length)`
-                          : '')
-                      }
-                    >
-                      {matLabel}
-                      {isCalib && (
-                        <span
-                          className="mfg-calib-table-pill"
-                          title={`Calibrated: ${(Math.sqrt(matFactor) * 100).toFixed(1)}% length`}
-                        >
-                          {(Math.sqrt(matFactor) * 100).toFixed(0)}%
-                        </span>
-                      )}
-                    </td>
-                    <td className="mfg-num">{dia_mm} mm</td>
-                    <td className="mfg-num">{wall_mm}</td>
-                    <td className="mfg-num mfg-len">{t.length_mm.toFixed(1)} mm</td>
-                    <td className="mfg-num mfg-susp">{susp.mm.toFixed(1)} mm</td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        </div>
-      </div>
-      <div className="mfg-footer">
-        <div className="mfg-hint">
-          {config.sameAbsoluteSuspension
-            ? `Holes drilled at uniform ${tubeSuspension(config, tubes, 0).mm.toFixed(1)} mm from top`
-            : `Holes drilled @ ${(config.suspensionPoint * 100).toFixed(1)}% of length from top`}
-          {isMaterialCalibrated && (
-            <span style={{ marginLeft: 8, color: '#7ddb91' }}>
-              • {matLabel} calibrated: {(Math.sqrt(currentSpeedFactor) * 100).toFixed(1)}% length
-            </span>
+    <>
+      {/* ────────────────── Section 1: Overview ────────────────── */}
+      <Section id="mfgOverview" title="Overview" open={open} toggle={toggle}>
+        <div className="mfg-container">
+          {canScrollLeft && (
+            <button className="mfg-scroll-hint left" onClick={scrollLeft} title="Scroll left">
+              ‹
+            </button>
           )}
-        </div>
-        <button className="mini-action-btn" onClick={copyCutList} title="Copy cut list to clipboard (tab-separated)">
-          {copied ? '✓ Copied' : '📋 Copy cut list'}
-        </button>
-      </div>
-
-      {/* ────────────────── Frequency Analysis & Cut Tool ────────────────── */}
-      <div className="mfg-analyzer">
-        <div className="mfg-analyzer-header">
-          <div className="mfg-analyzer-title">
-            <span>🔬 Tuning & Cut Tool</span>
+          {canScrollRight && (
+            <button className="mfg-scroll-hint right" onClick={scrollRight} title="Scroll right for suspension position">
+              <span>more ›</span>
+            </button>
+          )}
+          <div className="mfg-table-wrap" ref={wrapRef} onScroll={checkScroll}>
+            <table className="mfg-table">
+              <thead>
+                <tr>
+                  <th title="Tube index & note">Tube</th>
+                  <th title="Tube material">Material</th>
+                  <th title="Outer diameter in mm">Ø</th>
+                  <th title="Wall thickness in mm">Wall</th>
+                  <th title="Cut length in mm">Length</th>
+                  <th title="Suspension hole distance from top end in mm">Susp.</th>
+                </tr>
+              </thead>
+              <tbody>
+                {tubes.map((t, i) => {
+                  const g = tubeGeometry(config, i)
+                  const susp = tubeSuspension(config, tubes, i)
+                  const matLabel = MATERIALS[g.material]?.label ?? g.material
+                  const matFactor = config.materialSpeedFactors?.[g.material] ?? 1.0
+                  const isCalib = Math.abs(matFactor - 1.0) > 0.0005
+                  const dia_mm = (g.Do * 1000).toFixed(1)
+                  const wall_mm = g.solid ? 'solid' : (g.t * 1000).toFixed(2) + ' mm'
+                  const isSelected = activeIdx === i
+                  return (
+                    <tr
+                      key={i}
+                      className={isSelected ? 'mfg-row-active' : ''}
+                      onClick={() => {
+                        setSelectedTubeIndex(i)
+                        setCapturedFreq(null)
+                        setManualFreqInput('')
+                        setCustomLengthInput('')
+                      }}
+                      title={`Click to select Tube #${i + 1} (${t.note}) for tuning analysis`}
+                    >
+                      <td>
+                        <span className="mfg-idx">#{i + 1}</span>{' '}
+                        <span className="mfg-note">{t.note}</span>
+                      </td>
+                      <td
+                        className="mfg-mat"
+                        title={
+                          matLabel +
+                          (isCalib
+                            ? ` (Calibrated: ${(Math.sqrt(matFactor) * 100).toFixed(1)}% length)`
+                            : '')
+                        }
+                      >
+                        {matLabel}
+                        {isCalib && (
+                          <span
+                            className="mfg-calib-table-pill"
+                            title={`Calibrated: ${(Math.sqrt(matFactor) * 100).toFixed(1)}% length`}
+                          >
+                            {(Math.sqrt(matFactor) * 100).toFixed(0)}%
+                          </span>
+                        )}
+                      </td>
+                      <td className="mfg-num">{dia_mm} mm</td>
+                      <td className="mfg-num">{wall_mm}</td>
+                      <td className="mfg-num mfg-len">{t.length_mm.toFixed(1)} mm</td>
+                      <td className="mfg-num mfg-susp">{susp.mm.toFixed(1)} mm</td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
           </div>
-          <span className="mfg-analyzer-badge">
-            Tube #{activeIdx + 1} • {activeTube?.note}
-          </span>
         </div>
-
-        {/* Tube picker row */}
-        <div className="mfg-select-row">
-          <label htmlFor="mfg-tube-pick">Select tube:</label>
-          <select
-            id="mfg-tube-pick"
-            className="mfg-tube-select"
-            value={activeIdx}
-            onChange={(e) => {
-              const idx = parseInt(e.target.value, 10)
-              setSelectedTubeIndex(idx)
-              setCapturedFreq(null)
-              setManualFreqInput('')
-              setCustomLengthInput('')
-            }}
-          >
-            {tubes.map((t, i) => (
-              <option key={i} value={i}>
-                #{i + 1} {t.note} ({t.freq.toFixed(1)} Hz) · {t.length_mm.toFixed(1)} mm
-              </option>
-            ))}
-          </select>
-        </div>
-
-        {/* Microphone and reference tone controls */}
-        <div className="mfg-mic-controls">
-          <button
-            type="button"
-            className="mfg-play-btn"
-            onClick={() => previewTube(activeIdx)}
-            title={`Play reference tone for Tube #${activeIdx + 1} (${activeTube?.note}, ${targetFreq.toFixed(1)} Hz)`}
-          >
-            ▶️
-          </button>
-          <button
-            type="button"
-            className={`mfg-mic-btn ${isListening ? 'active' : ''}`}
-            onClick={toggleMic}
-            title={isListening ? 'Stop microphone' : 'Enable microphone to analyze tube strike frequency'}
-          >
-            {isListening ? (
-              <>
-                <span style={{ fontSize: 10 }}>🔴</span> Listening... (Click to stop)
-              </>
-            ) : (
-              <>
-                <span>🎙️</span> Enable Microphone
-              </>
+        <div className="mfg-footer">
+          <div className="mfg-hint">
+            {config.sameAbsoluteSuspension
+              ? `Holes drilled at uniform ${tubeSuspension(config, tubes, 0).mm.toFixed(1)} mm from top`
+              : `Holes drilled @ ${(config.suspensionPoint * 100).toFixed(1)}% of length from top`}
+            {isMaterialCalibrated && (
+              <span style={{ marginLeft: 8, color: '#7ddb91' }}>
+                • {matLabel} calibrated: {(Math.sqrt(currentSpeedFactor) * 100).toFixed(1)}% length
+              </span>
             )}
+          </div>
+          <button className="mini-action-btn" onClick={copyCutList} title="Copy cut list to clipboard (tab-separated)">
+            {copied ? '✓ Copied' : '📋 Copy cut list'}
           </button>
         </div>
 
-        {/* Live VU meter */}
-        {isListening && (
-          <div className="mfg-vu-meter" title={`Input level: ${(liveRms * 100).toFixed(0)}%`}>
-            <div
-              className="mfg-vu-bar"
-              style={{ width: `${Math.min(100, liveRms * 350)}%` }}
-            />
-          </div>
-        )}
-
-        {micError && (
-          <div className="mfg-hint" style={{ color: '#ff8a65', background: 'rgba(255, 138, 101, 0.1)', padding: '4px 6px', borderRadius: 4 }}>
-            ⚠️ {micError}
-          </div>
-        )}
-
-        {/* Tuner Box */}
-        <div className="mfg-tuner-box">
-          <div className="mfg-tuner-readout">
-            <div className="mfg-freq-live">
-              {measuredFreq > 0 ? (
-                <>
-                  {measuredFreq.toFixed(1)} <span className="mfg-freq-unit">Hz</span>
-                </>
-              ) : (
-                <span style={{ fontSize: 13, color: '#7b88a1', fontWeight: 400 }}>
-                  {isListening ? 'Strike tube to detect frequency...' : 'Microphone inactive'}
-                </span>
-              )}
+        {/* ────────────────── Striker 3D Print / Fabrication (STL) ────────────────── */}
+        <div className="mfg-striker-card">
+          <div className="mfg-striker-header">
+            <div className="mfg-striker-title">
+              <span>🖨️ Striker 3D Print / Fabrication (STL)</span>
             </div>
-            <div className="mfg-target-hint">
-              Target: <strong>{targetFreq.toFixed(1)} Hz</strong> ({activeTube?.note})
-            </div>
+            <span className="mfg-striker-badge">
+              {mfgStrikerForm} • {mfgStrikerMat}
+            </span>
           </div>
 
-          {/* Deviation Gauge */}
-          <div className="mfg-cents-gauge" title={measuredFreq > 0 ? `${centsDeviation > 0 ? '+' : ''}${centsDeviation.toFixed(1)} cents` : 'Tuning needle'}>
-            <div className="mfg-gauge-center" />
-            <div className="mfg-gauge-sweet-spot" />
-            {measuredFreq > 0 && (
-              <div
-                className="mfg-gauge-needle"
-                style={{
-                  left: `${needlePercent}%`,
-                  backgroundColor: needleColor,
-                  boxShadow: `0 0 6px ${needleColor}`,
-                }}
+          <div className="mfg-striker-grid">
+            <div className="mfg-striker-prop">
+              <span className="mfg-prop-label">Diameter:</span>
+              <strong>Ø {mfgStrikerDims.diameter_mm} mm</strong>
+            </div>
+            <div className="mfg-striker-prop">
+              <span className="mfg-prop-label">Thickness:</span>
+              <strong>{mfgStrikerDims.height_mm} mm</strong>
+            </div>
+            <div className="mfg-striker-prop">
+              <span className="mfg-prop-label">Target Mass:</span>
+              <strong>{mfgOptimalMass.toFixed(0)} g</strong>
+              <span className="mfg-prop-sub">({mfgCurrentMass.toFixed(0)} g calc)</span>
+            </div>
+            <div className="mfg-striker-prop" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+              <span className="mfg-prop-label">Cord hole:</span>
+              <input
+                type="number"
+                step="0.5"
+                min="1"
+                max="10"
+                value={cordHoleMm}
+                onChange={(e) => setCordHoleMm(e.target.value)}
+                className="mfg-hole-input"
+                title="Central cord hole diameter in mm"
               />
-            )}
+              <span style={{ fontSize: 10, color: '#7b88a1' }}>mm</span>
+            </div>
           </div>
-          <div className="mfg-gauge-labels">
-            <span>−50¢ (Flat)</span>
-            <span>0¢</span>
-            <span>+50¢ (Sharp)</span>
+
+          <div className="mfg-striker-actions">
+            <button
+              type="button"
+              className="mfg-stl-btn"
+              onClick={handleDownloadSTL}
+              title={`Download 3D printable binary STL: Ø${mfgStrikerDims.diameter_mm}mm × ${mfgStrikerDims.height_mm}mm ${mfgStrikerForm}`}
+            >
+              {stlExported ? '✓ STL Downloaded!' : '💾 Download Striker STL'}
+            </button>
+            <div className="mfg-striker-hint">
+              Watertight 3D model with central suspension cord hole. Ready to slice for 3D printing (PETG/PLA) or lathe/turning.
+            </div>
           </div>
         </div>
+      </Section>
 
-        {/* Strike capture banner */}
-        {capturedFreq && (
-          <div className="mfg-strike-banner">
-            <span>🎯 Strike locked: <strong>{capturedFreq.toFixed(1)} Hz</strong> ({noteInfo.note})</span>
-            <button
-              onClick={() => {
+      {/* ────────────────── Section 2: Tuning Tool ────────────────── */}
+      <Section id="mfgTuning" title="Tuning Tool" open={open} toggle={toggle}>
+        <div className="mfg-tuning-wrap">
+          <div className="mfg-tuning-subhead">
+            <span className="mfg-subhead-hint">Microphone pitch detection & cut calculation</span>
+            <span className="mfg-analyzer-badge">
+              Tube #{activeIdx + 1} • {activeTube?.note}
+            </span>
+          </div>
+
+          {/* Tube picker row */}
+          <div className="mfg-select-row">
+            <label htmlFor="mfg-tube-pick">Select tube:</label>
+            <select
+              id="mfg-tube-pick"
+              className="mfg-tube-select"
+              value={activeIdx}
+              onChange={(e) => {
+                const idx = parseInt(e.target.value, 10)
+                setSelectedTubeIndex(idx)
                 setCapturedFreq(null)
                 setManualFreqInput('')
+                setCustomLengthInput('')
               }}
-              title="Clear locked strike frequency and re-measure"
             >
-              Re-measure ↺
+              {tubes.map((t, i) => (
+                <option key={i} value={i}>
+                  #{i + 1} {t.note} ({t.freq.toFixed(1)} Hz) · {t.length_mm.toFixed(1)} mm
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Microphone and reference tone controls */}
+          <div className="mfg-mic-controls">
+            <button
+              type="button"
+              className="mfg-play-btn"
+              onClick={() => previewTube(activeIdx)}
+              title={`Play reference tone for Tube #${activeIdx + 1} (${activeTube?.note}, ${targetFreq.toFixed(1)} Hz)`}
+            >
+              ▶️
+            </button>
+            <button
+              type="button"
+              className={`mfg-mic-btn ${isListening ? 'active' : ''}`}
+              onClick={toggleMic}
+              title={isListening ? 'Stop microphone' : 'Enable microphone to analyze tube strike frequency'}
+            >
+              {isListening ? (
+                <>
+                  <span style={{ fontSize: 10 }}>🔴</span> Listening... (Click to stop)
+                </>
+              ) : (
+                <>
+                  <span>🎙️</span> Enable Microphone
+                </>
+              )}
             </button>
           </div>
-        )}
 
-        {/* Length inputs */}
-        <div className="mfg-length-input-row">
-          <span title="Physical length of your rough-cut tube before trimming">Current tube length:</span>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-            <input
-              type="number"
-              step="0.5"
-              placeholder={designedLength_mm.toFixed(1)}
-              value={customLengthInput}
-              onChange={(e) => setCustomLengthInput(e.target.value)}
-              title="Enter rough measured length in mm (default: designed length)"
-            />
-            <span style={{ color: '#7b88a1', fontSize: 10 }}>mm</span>
-            {customLengthInput && (
-              <button
-                className="mini-action-btn"
-                style={{ padding: '1px 5px', fontSize: 9 }}
-                onClick={() => setCustomLengthInput('')}
-                title="Reset to designed length"
-              >
-                Reset
-              </button>
-            )}
+          {/* Live VU meter */}
+          {isListening && (
+            <div className="mfg-vu-meter" title={`Input level: ${(liveRms * 100).toFixed(0)}%`}>
+              <div
+                className="mfg-vu-bar"
+                style={{ width: `${Math.min(100, liveRms * 350)}%` }}
+              />
+            </div>
+          )}
+
+          {micError && (
+            <div className="mfg-hint" style={{ color: '#ff8a65', background: 'rgba(255, 138, 101, 0.1)', padding: '4px 6px', borderRadius: 4 }}>
+              ⚠️ {micError}
+            </div>
+          )}
+
+          {/* Tuner Box */}
+          <div className="mfg-tuner-box">
+            <div className="mfg-tuner-readout">
+              <div className="mfg-freq-live">
+                {measuredFreq > 0 ? (
+                  <>
+                    {measuredFreq.toFixed(1)} <span className="mfg-freq-unit">Hz</span>
+                  </>
+                ) : (
+                  <span style={{ fontSize: 13, color: '#7b88a1', fontWeight: 400 }}>
+                    {isListening ? 'Strike tube to detect frequency...' : 'Microphone inactive'}
+                  </span>
+                )}
+              </div>
+              <div className="mfg-target-hint">
+                Target: <strong>{targetFreq.toFixed(1)} Hz</strong> ({activeTube?.note})
+              </div>
+            </div>
+
+            {/* Deviation Gauge */}
+            <div className="mfg-cents-gauge" title={measuredFreq > 0 ? `${centsDeviation > 0 ? '+' : ''}${centsDeviation.toFixed(1)} cents` : 'Tuning needle'}>
+              <div className="mfg-gauge-center" />
+              <div className="mfg-gauge-sweet-spot" />
+              {measuredFreq > 0 && (
+                <div
+                  className="mfg-gauge-needle"
+                  style={{
+                    left: `${needlePercent}%`,
+                    backgroundColor: needleColor,
+                    boxShadow: `0 0 6px ${needleColor}`,
+                  }}
+                />
+              )}
+            </div>
+            <div className="mfg-gauge-labels">
+              <span>−50¢ (Flat)</span>
+              <span>0¢</span>
+              <span>+50¢ (Sharp)</span>
+            </div>
           </div>
-        </div>
 
-        <div className="mfg-length-input-row">
-          <span title="Measured frequency in Hz (updated by mic or manual entry)">Measured frequency:</span>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-            <input
-              type="number"
-              step="0.1"
-              placeholder={measuredFreq > 0 ? measuredFreq.toFixed(1) : 'e.g. 510.5'}
-              value={manualFreqInput}
-              onChange={(e) => {
-                setManualFreqInput(e.target.value)
-                setCapturedFreq(null)
-              }}
-              title="Enter measured frequency in Hz manually or use microphone"
-            />
-            <span style={{ color: '#7b88a1', fontSize: 10 }}>Hz</span>
-            {manualFreqInput && (
+          {/* Strike capture banner */}
+          {capturedFreq && (
+            <div className="mfg-strike-banner">
+              <span>🎯 Strike locked: <strong>{capturedFreq.toFixed(1)} Hz</strong> ({noteInfo.note})</span>
               <button
-                className="mini-action-btn"
-                style={{ padding: '1px 5px', fontSize: 9 }}
                 onClick={() => {
+                  setCapturedFreq(null)
                   setManualFreqInput('')
+                }}
+                title="Clear locked strike frequency and re-measure"
+              >
+                Re-measure ↺
+              </button>
+            </div>
+          )}
+
+          {/* Length inputs */}
+          <div className="mfg-length-input-row">
+            <span title="Physical length of your rough-cut tube before trimming">Current tube length:</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+              <input
+                type="number"
+                step="0.5"
+                placeholder={designedLength_mm.toFixed(1)}
+                value={customLengthInput}
+                onChange={(e) => setCustomLengthInput(e.target.value)}
+                title="Enter rough measured length in mm (default: designed length)"
+              />
+              <span style={{ color: '#7b88a1', fontSize: 10 }}>mm</span>
+              {customLengthInput && (
+                <button
+                  className="mini-action-btn"
+                  style={{ padding: '1px 5px', fontSize: 9 }}
+                  onClick={() => setCustomLengthInput('')}
+                  title="Reset to designed length"
+                >
+                  Reset
+                </button>
+              )}
+            </div>
+          </div>
+
+          <div className="mfg-length-input-row">
+            <span title="Measured frequency in Hz (updated by mic or manual entry)">Measured frequency:</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+              <input
+                type="number"
+                step="0.1"
+                placeholder={measuredFreq > 0 ? measuredFreq.toFixed(1) : 'e.g. 510.5'}
+                value={manualFreqInput}
+                onChange={(e) => {
+                  setManualFreqInput(e.target.value)
                   setCapturedFreq(null)
                 }}
-                title="Clear manual frequency"
-              >
-                Clear
-              </button>
-            )}
+                title="Enter measured frequency in Hz manually or use microphone"
+              />
+              <span style={{ color: '#7b88a1', fontSize: 10 }}>Hz</span>
+              {manualFreqInput && (
+                <button
+                  className="mini-action-btn"
+                  style={{ padding: '1px 5px', fontSize: 9 }}
+                  onClick={() => {
+                    setManualFreqInput('')
+                    setCapturedFreq(null)
+                  }}
+                  title="Clear manual frequency"
+                >
+                  Clear
+                </button>
+              )}
+            </div>
           </div>
+
+          {/* Cut Recommendation Card */}
+          {measuredFreq > 0 ? (
+            <div className={`mfg-cut-card ${cutEstimate.status}`}>
+              <div className="mfg-cut-primary">
+                <div className="mfg-cut-amount">
+                  {cutEstimate.status === 'in_tune' && (
+                    <><span>✓</span> In Tune (±{Math.abs(cutEstimate.cents).toFixed(1)}¢)</>
+                  )}
+                  {cutEstimate.status === 'flat' && (
+                    <><span>✂️</span> Cut off: <strong>{cutEstimate.cutAmount_mm.toFixed(1)} mm</strong></>
+                  )}
+                  {cutEstimate.status === 'sharp' && (
+                    <><span>⚠️</span> Too short by {Math.abs(cutEstimate.cutAmount_mm).toFixed(1)} mm</>
+                  )}
+                </div>
+                <span
+                  className="mfg-analyzer-badge"
+                  style={{
+                    color: needleColor,
+                    borderColor: needleColor,
+                    background: `${needleColor}20`,
+                  }}
+                >
+                  {cutEstimate.status === 'in_tune' ? 'Exact' : cutEstimate.status === 'flat' ? 'Flat' : 'Sharp'}
+                </span>
+              </div>
+
+              <div className="mfg-cut-details">
+                <div>Cut length: <strong>{newLength_mm.toFixed(1)} mm</strong></div>
+                <div>Susp. hole: <strong>{newSusp_mm.toFixed(1)} mm</strong></div>
+                <div>Target: <strong>{targetFreq.toFixed(1)} Hz</strong> ({activeTube?.note})</div>
+                <div>Offset: <strong>{centsDeviation > 0 ? '+' : ''}{centsDeviation.toFixed(1)}¢</strong></div>
+              </div>
+
+              {cutEstimate.status === 'sharp' && (
+                <div className="mfg-hint" style={{ color: '#ff9e80', marginTop: 4 }}>
+                  Tube is vibrating higher than target. Shortening further will raise the pitch.
+                  To lower pitch: sand or grind the center antinode wall thinner, or reassign to a higher note.
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="mfg-hint" style={{ textAlign: 'center', padding: '6px 0', color: '#6a7488' }}>
+              Strike the tube near your microphone to detect pitch & calculate exact cut.
+            </div>
+          )}
         </div>
+      </Section>
 
-        {/* Cut Recommendation Card */}
-        {measuredFreq > 0 ? (
-          <div className={`mfg-cut-card ${cutEstimate.status}`}>
-            <div className="mfg-cut-primary">
-              <div className="mfg-cut-amount">
-                {cutEstimate.status === 'in_tune' && (
-                  <><span>✓</span> In Tune (±{Math.abs(cutEstimate.cents).toFixed(1)}¢)</>
-                )}
-                {cutEstimate.status === 'flat' && (
-                  <><span>✂️</span> Cut off: <strong>{cutEstimate.cutAmount_mm.toFixed(1)} mm</strong></>
-                )}
-                {cutEstimate.status === 'sharp' && (
-                  <><span>⚠️</span> Too short by {Math.abs(cutEstimate.cutAmount_mm).toFixed(1)} mm</>
-                )}
-              </div>
-              <span
-                className="mfg-analyzer-badge"
-                style={{
-                  color: needleColor,
-                  borderColor: needleColor,
-                  background: `${needleColor}20`,
-                }}
-              >
-                {cutEstimate.status === 'in_tune' ? 'Exact' : cutEstimate.status === 'flat' ? 'Flat' : 'Sharp'}
-              </span>
-            </div>
-
-            <div className="mfg-cut-details">
-              <div>Cut length: <strong>{newLength_mm.toFixed(1)} mm</strong></div>
-              <div>Susp. hole: <strong>{newSusp_mm.toFixed(1)} mm</strong></div>
-              <div>Target: <strong>{targetFreq.toFixed(1)} Hz</strong> ({activeTube?.note})</div>
-              <div>Offset: <strong>{centsDeviation > 0 ? '+' : ''}{centsDeviation.toFixed(1)}¢</strong></div>
-            </div>
-
-            {cutEstimate.status === 'sharp' && (
-              <div className="mfg-hint" style={{ color: '#ff9e80', marginTop: 4 }}>
-                Tube is vibrating higher than target. Shortening further will raise the pitch.
-                To lower pitch: sand or grind the center antinode wall thinner, or reassign to a higher note.
-              </div>
-            )}
-          </div>
-        ) : (
-          <div className="mfg-hint" style={{ textAlign: 'center', padding: '6px 0', color: '#6a7488' }}>
-            Strike the tube near your microphone to detect pitch & calculate exact cut.
-          </div>
-        )}
-
-        {/* Material Calibration Card */}
-        <div className={`mfg-calib-box ${isMaterialCalibrated ? 'is-calibrated' : ''}`}>
+      {/* ────────────────── Section 3: Calibration Tool ────────────────── */}
+      <Section id="mfgCalibration" title="Calibration Tool" open={open} toggle={toggle}>
+        <div className={`mfg-calib-box ${isMaterialCalibrated ? 'is-calibrated' : ''}`} style={{ marginTop: 0 }}>
           <div className="mfg-calib-header">
             <span className="mfg-calib-title">🎯 Material Calibration ({matLabel})</span>
             {isMaterialCalibrated && (
@@ -1374,8 +1628,8 @@ function ManufacturingSection() {
             </div>
           )}
         </div>
-      </div>
-    </div>
+      </Section>
+    </>
   )
 }
 

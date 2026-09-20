@@ -65,6 +65,12 @@ export const HELP: Record<string, string> = {
     '→ harsh metallic clank. Note the curvature combines with the tube\'s own radius: ' +
     'even a "flat" disc contacts a round tube at R = tube radius.',
 
+  strikerDistance:
+    'Distance between the striker edge and the inner tube wall when at rest. ' +
+    'In Automatic mode, setting this clearance determines the striker diameter, and the ' +
+    'thickness is automatically calculated to achieve the ideal acoustic impedance mass (m_striker ≈ m_eff). ' +
+    'Smaller distance (e.g. 8–10 mm) = sounds in gentle breezes. Larger distance (e.g. 20–25 mm) = sounds only in stronger gusts.',
+
   strikerDiameter:
     'Striker disc diameter. Bigger = more mass (louder, deeper transient) but needs more ' +
     'swing room: in the sim the disc must fit inside the tube ring, and a disc wider than ' +

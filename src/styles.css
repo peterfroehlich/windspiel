@@ -18,6 +18,54 @@ body { font-family: system-ui, sans-serif; color: #dfe3ea; }
   margin-bottom: 8px; flex: none;
 }
 
+/* ───────────────────────── Sidebar Navigation Tabs ───────────────────────── */
+.main-tabs {
+  display: flex;
+  background: rgba(14, 18, 26, 0.95);
+  border: 1px solid #232c3d;
+  border-radius: 8px;
+  padding: 3px;
+  margin-bottom: 10px;
+  gap: 3px;
+  flex: none;
+}
+
+.main-tab {
+  flex: 1;
+  background: none;
+  border: 1px solid transparent;
+  color: #8892a6;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  padding: 6px 3px;
+  border-radius: 6px;
+  cursor: pointer;
+  text-align: center;
+  transition: all 0.15s ease;
+  user-select: none;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.main-tab:hover {
+  color: #dfe3ea;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.main-tab.active {
+  background: #222d42;
+  color: #ffffff;
+  border-color: #3e5070;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+}
+
+.main-tab:focus-visible {
+  outline: 2px solid #6c8cff;
+  outline-offset: -1px;
+}
+
 /* scrollable section stack */
 .sections {
   flex: 1; min-height: 0; overflow-y: auto;
@@ -542,6 +590,26 @@ body { font-family: system-ui, sans-serif; color: #dfe3ea; }
 
 /* ───────────────────────── Manufacturing Tuning & Analysis ───────────────────────── */
 
+.mfg-tuning-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.mfg-tuning-subhead {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: -2px;
+}
+
+.mfg-subhead-hint {
+  font-size: 10.5px;
+  color: #7b88a1;
+}
+
 .mfg-analyzer {
   margin-top: 14px;
   padding: 10px;
@@ -1058,6 +1126,185 @@ body { font-family: system-ui, sans-serif; color: #dfe3ea; }
   margin-left: 4px;
   font-family: ui-monospace, SFMono-Regular, monospace;
 }
+
+/* Striker mode toggle */
+.striker-mode-toggle {
+  display: flex;
+  background: #111622;
+  padding: 3px;
+  border-radius: 6px;
+  border: 1px solid #232c3d;
+  margin-bottom: 10px;
+  gap: 3px;
+}
+
+.striker-mode-btn {
+  flex: 1;
+  background: transparent;
+  border: none;
+  color: #7b88a1;
+  font-size: 11px;
+  font-weight: 500;
+  padding: 5px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.striker-mode-btn:hover {
+  color: #dfe3ea;
+}
+
+.striker-mode-btn.active {
+  background: #202b3d;
+  color: #6c8cff;
+  font-weight: 600;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+}
+
+.striker-auto-badge {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: rgba(108, 140, 255, 0.08);
+  border: 1px solid rgba(108, 140, 255, 0.25);
+  border-radius: 5px;
+  padding: 5px 8px;
+  margin: 2px 0 10px 0;
+  font-size: 10.5px;
+  color: #9cb5ff;
+}
+
+.striker-auto-badge strong {
+  color: #fff;
+}
+
+.striker-auto-tag {
+  font-size: 9.5px;
+  color: #7ddb91;
+  background: rgba(125, 219, 145, 0.12);
+  border: 1px solid rgba(125, 219, 145, 0.3);
+  padding: 1px 5px;
+  border-radius: 10px;
+}
+
+/* Manufacturing Striker Card */
+.mfg-striker-card {
+  margin-top: 10px;
+  padding: 10px;
+  border-radius: 6px;
+  background: #141a27;
+  border: 1px solid #232f48;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.mfg-striker-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.mfg-striker-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: #dfe3ea;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.mfg-striker-badge {
+  font-size: 10px;
+  padding: 1px 7px;
+  border-radius: 10px;
+  background: rgba(108, 140, 255, 0.15);
+  border: 1px solid rgba(108, 140, 255, 0.4);
+  color: #9cb5ff;
+}
+
+.mfg-striker-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px 12px;
+  background: rgba(0, 0, 0, 0.18);
+  padding: 6px 8px;
+  border-radius: 5px;
+  font-size: 11px;
+}
+
+.mfg-striker-prop {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.mfg-prop-label {
+  color: #7b88a1;
+  font-size: 10.5px;
+}
+
+.mfg-prop-sub {
+  color: #6a7791;
+  font-size: 9.5px;
+}
+
+.mfg-hole-input {
+  width: 44px;
+  background: #111622;
+  border: 1px solid #2a3449;
+  border-radius: 3px;
+  padding: 1px 4px;
+  font-size: 10.5px;
+  color: #dfe3ea;
+  text-align: right;
+  font-family: ui-monospace, SFMono-Regular, monospace;
+}
+.mfg-hole-input:focus {
+  border-color: #6c8cff;
+  outline: none;
+}
+
+.mfg-striker-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.mfg-stl-btn {
+  background: linear-gradient(135deg, #2b3e6c 0%, #1e2844 100%);
+  border: 1px solid #4868b3;
+  color: #dbe5ff;
+  border-radius: 4px;
+  padding: 6px 10px;
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  transition: all 0.15s ease;
+}
+
+.mfg-stl-btn:hover {
+  background: linear-gradient(135deg, #37518e 0%, #253359 100%);
+  border-color: #6c8cff;
+  color: #fff;
+  box-shadow: 0 0 10px rgba(108, 140, 255, 0.35);
+}
+
+.mfg-stl-btn:active {
+  transform: scale(0.98);
+}
+
+.mfg-striker-hint {
+  font-size: 9.5px;
+  color: #7b88a1;
+  line-height: 1.35;
+}
+
 
 
 
