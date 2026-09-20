@@ -254,7 +254,7 @@ function AcousticsInfo({ tubeIndex }: { tubeIndex?: number | null }) {
   const tube = tubes[idx]
   if (!tube) return null
   const spec = tubeSpec(config, tube, idx)
-  const striker = { material: config.strikerMaterial, form: config.strikerForm, diameter_mm: config.strikerDiameter_mm, height_mm: config.strikerHeight_mm }
+  const striker = { material: config.strikerMaterial, form: config.strikerForm, diameter_mm: config.strikerDiameter_mm, height_mm: config.strikerHeight_mm, sides: config.tubeCount }
   const mount = tubeMountingPosition(config, tubes, idx)
   const strikerY_mm = config.tubeDrop_mm + config.strikerDrop_mm
   const xi = Math.max(0.02, Math.min(0.98, (strikerY_mm - mount.top_mm) / tube.length_mm))
@@ -866,6 +866,7 @@ function previewTube(i: number) {
   const striker = {
     material: config.strikerMaterial, form: config.strikerForm,
     diameter_mm: config.strikerDiameter_mm, height_mm: config.strikerHeight_mm,
+    sides: config.tubeCount,
   }
   const partials = [1, 2.756, 5.404, 8.933].map((r) =>
     partialExcitation(r * f0, striker, spec, 0.1275, xi))
@@ -1135,7 +1136,22 @@ function ManufacturingTab({
   // Striker manufacturing properties
   const mfgStrikerDims = effectiveStrikerDimensions(config, tubes)
   const mfgStrikerMat = STRIKER_MATERIALS[config.strikerMaterial]?.label ?? config.strikerMaterial
-  const mfgStrikerForm = STRIKER_FORMS[config.strikerForm]?.label ?? config.strikerForm
+  const POLYGON_NAMES: Record<number, string> = {
+    3: 'Triangle',
+    4: 'Square',
+    5: 'Pentagon',
+    6: 'Hexagon',
+    7: 'Heptagon',
+    8: 'Octagon',
+    9: 'Nonagon',
+    10: 'Decagon',
+    11: 'Hendecagon',
+    12: 'Dodecagon',
+  }
+  const formBase = STRIKER_FORMS[config.strikerForm]?.label ?? config.strikerForm
+  const mfgStrikerForm = config.strikerForm === 'multisided'
+    ? `${formBase} (${POLYGON_NAMES[config.tubeCount] ?? `${config.tubeCount}-gon`})`
+    : formBase
   const mfgLongestTube = tubes.length
     ? tubes.reduce((max, t) => (t.length_mm > max.length_mm ? t : max), tubes[0])
     : undefined
@@ -1150,6 +1166,7 @@ function ManufacturingTab({
       form: config.strikerForm,
       diameter_mm: mfgStrikerDims.diameter_mm,
       height_mm: mfgStrikerDims.height_mm,
+      sides: config.tubeCount,
     }) * 1000
 
   const handleDownloadSTL = () => {
@@ -1160,6 +1177,7 @@ function ManufacturingTab({
       height_mm: mfgStrikerDims.height_mm,
       material: config.strikerMaterial,
       holeDiameter_mm: holeDia,
+      tubeCount: config.tubeCount,
     })
     setStlExported(true)
     setTimeout(() => setStlExported(false), 2500)

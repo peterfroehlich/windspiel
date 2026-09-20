@@ -44,8 +44,8 @@ export const STRIKER_MATERIALS: Record<string, {
 export const STRIKER_FORMS: Record<string, {
   id: string; label: string; R_s: (diameter_m: number) => number; note: string
 }> = {
-  disc:     { id: 'disc',     label: 'Disc (flat face)',   R_s: () => Infinity, note: 'flat face — warmest contact' },
-  sphere:   { id: 'sphere',   label: 'Sphere (dome)',      R_s: (d) => d / 2, note: 'dome — balanced' },
-  donut:    { id: 'donut',    label: 'Donut (ring edge)',  R_s: (d) => d * 0.012, note: 'ring edge — bright ping' },
-  cylinder: { id: 'cylinder', label: 'Cylinder (rim)',     R_s: (d) => d * 0.004, note: 'sharp rim — metallic clank' },
+  multisided: { id: 'multisided', label: 'Multisided', R_s: () => Infinity, note: 'polygonal flat face — matched to tube count' },
+  sphere:     { id: 'sphere',     label: 'Sphere (dome)',      R_s: (d) => d / 2, note: 'dome — balanced' },
+  donut:      { id: 'donut',      label: 'Donut (ring edge)',  R_s: (d) => d * 0.012, note: 'ring edge — bright ping' },
+  cylinder:   { id: 'cylinder',   label: 'Cylinder (rim)',     R_s: (d) => d * 0.004, note: 'sharp rim — metallic clank' },
 }

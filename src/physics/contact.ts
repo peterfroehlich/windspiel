@@ -56,13 +56,14 @@ export interface StrikerSpec {
   form: string
   diameter_mm: number
   height_mm: number
+  sides?: number
 }
 
 /** Contact duration τ [s] for a strike. Combines striker + tube curvature:
  *  1/R_eff = 1/R_s + 1/R_tube (a flat disc on a round tube is NOT flat). */
 export function contactDuration(striker: StrikerSpec, spec: TubeSpec, v: number, xi = 0.5): number {
   const sm = STRIKER_MATERIALS[striker.material] ?? STRIKER_MATERIALS.hardWood
-  const form = STRIKER_FORMS[striker.form] ?? STRIKER_FORMS.disc
+  const form = STRIKER_FORMS[striker.form] ?? STRIKER_FORMS.multisided
   const tm = MATERIALS[spec.material] ?? MATERIALS.aluminum
   const m = strikerMass(striker)
   const Rs = form.R_s(striker.diameter_mm / 1000)
@@ -85,11 +86,21 @@ export function partialExcitation(f: number, striker: StrikerSpec, spec: TubeSpe
 }
 
 /** Approximate volume [m³] based on striker 3D form */
-export function strikerVolume_m3(form: string, diameter_mm: number, height_mm: number): number {
+export function strikerVolume_m3(
+  form: string,
+  diameter_mm: number,
+  height_mm: number,
+  sides = 6
+): number {
   const r = diameter_mm / 2000
   const h = height_mm / 1000
   if (r <= 0 || h <= 0) return 0
   switch (form) {
+    case 'multisided': {
+      const N = Math.max(3, sides)
+      const area = 0.5 * N * r * r * Math.sin((2 * Math.PI) / N)
+      return area * h
+    }
     case 'sphere':
       // Oblate ellipsoid: semi-axes r, h/2, r -> V = 4/3 * pi * r * r * (h/2) = 2/3 * pi * r^2 * h
       return (2 / 3) * Math.PI * r * r * h
@@ -104,7 +115,6 @@ export function strikerVolume_m3(form: string, diameter_mm: number, height_mm: n
       return Math.PI * Math.PI * R_major * r_minor * h
     }
     case 'cylinder':
-    case 'disc':
     default:
       return Math.PI * r * r * h
   }
@@ -112,7 +122,7 @@ export function strikerVolume_m3(form: string, diameter_mm: number, height_mm: n
 
 export function strikerMass(s: StrikerSpec): number {
   const m = STRIKER_MATERIALS[s.material] ?? STRIKER_MATERIALS.hardWood
-  const vol = strikerVolume_m3(s.form, s.diameter_mm, s.height_mm)
+  const vol = strikerVolume_m3(s.form, s.diameter_mm, s.height_mm, s.sides)
   return m.density * vol
 }
 
@@ -123,7 +133,8 @@ export function solveStrikerHeight_mm(
   targetMass_kg: number,
   material: string,
   form: string,
-  diameter_mm: number
+  diameter_mm: number,
+  sides = 6
 ): number {
   const m = STRIKER_MATERIALS[material] ?? STRIKER_MATERIALS.hardWood
   const density = m.density
@@ -133,6 +144,12 @@ export function solveStrikerHeight_mm(
 
   let h_m: number
   switch (form) {
+    case 'multisided': {
+      const N = Math.max(3, sides)
+      const area = 0.5 * N * r * r * Math.sin((2 * Math.PI) / N)
+      h_m = area > 0 ? targetVol / area : targetVol / (Math.PI * r * r)
+      break
+    }
     case 'sphere':
       h_m = targetVol / ((2 / 3) * Math.PI * r * r)
       break
@@ -166,7 +183,6 @@ export function solveStrikerHeight_mm(
       break
     }
     case 'cylinder':
-    case 'disc':
     default:
       h_m = targetVol / (Math.PI * r * r)
       break

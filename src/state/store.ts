@@ -41,7 +41,7 @@ export interface ChimeConfig {
   strikerMaterial: string
   strikerDiameter_mm: number
   strikerHeight_mm: number
-  strikerForm: string            // disc | sphere | donut | cylinder (Hertzian contact)
+  strikerForm: string            // multisided | sphere | donut | cylinder (Hertzian contact)
   strikerMode?: 'auto' | 'manual' // automatic sizing vs manual dimensions
   strikerDistanceToTube_mm?: number // clearance gap in auto mode (default: 15 mm)
   strikerDrop_mm: number        // top of striker below tube tops
@@ -194,7 +194,8 @@ export function effectiveStrikerDimensions(
     targetMass_kg,
     config.strikerMaterial,
     config.strikerForm,
-    diameter_mm
+    diameter_mm,
+    config.tubeCount
   )
 
   return { diameter_mm, height_mm }

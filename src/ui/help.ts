@@ -63,7 +63,7 @@ export const HELP: Record<string, string> = {
     '≈ 0.35/τ. Rounded contacts (long τ) mute the inharmonic upper partials → smooth, ' +
     'pure tone. Sharp rims (short contact radius) excite the 2.756× and 5.404× partials ' +
     '→ harsh metallic clank. Note the curvature combines with the tube\'s own radius: ' +
-    'even a "flat" disc contacts a round tube at R = tube radius.',
+    'even a flat face (such as the Multisided polygon) contacts a round tube at R = tube radius.',
 
   strikerDistance:
     'Distance between the striker edge and the inner tube wall when at rest. ' +

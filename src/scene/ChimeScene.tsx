@@ -143,8 +143,31 @@ function Striker({ dropY }: { dropY: number }) {
   const strikeMat = (
     <meshStandardMaterial color={mat.color} roughness={mat.roughness} metalness={config.strikerMaterial === 'metal' ? 0.9 : 0.05} />
   )
+  const multisidedGeo = useMemo(() => {
+    const N = Math.max(3, config.tubeCount)
+    const shape = new THREE.Shape()
+    for (let i = 0; i < N; i++) {
+      const a = (i + 0.5) * ((Math.PI * 2) / N)
+      const px = Math.cos(a) * R
+      const py = Math.sin(a) * R
+      if (i === 0) shape.moveTo(px, py); else shape.lineTo(px, py)
+    }
+    shape.closePath()
+    const g = new THREE.ExtrudeGeometry(shape, { depth: h, bevelEnabled: false })
+    g.center()
+    g.rotateX(-Math.PI / 2)
+    return g
+  }, [config.tubeCount, R, h])
+
   let strikerMesh: React.ReactNode
   switch (config.strikerForm) {
+    case 'multisided':
+      strikerMesh = (
+        <mesh castShadow geometry={multisidedGeo}>
+          {strikeMat}
+        </mesh>
+      )
+      break
     case 'sphere':   // oblate ellipsoid: diameter fixed, thickness = slider
       strikerMesh = (
         <mesh castShadow scale={[1, Math.max(0.2, h / (2 * R)), 1]}>
@@ -168,6 +191,7 @@ function Striker({ dropY }: { dropY: number }) {
       break
     }
     case 'cylinder': // clean cylinder (sharp-rim character is in the contact physics)
+    default:
       strikerMesh = (
         <mesh castShadow>
           <cylinderGeometry args={[R, R, h, 32]} />
@@ -175,13 +199,6 @@ function Striker({ dropY }: { dropY: number }) {
         </mesh>
       )
       break
-    default:         // disc (flat face)
-      strikerMesh = (
-        <mesh castShadow>
-          <cylinderGeometry args={[R, R, h, 32]} />
-          {strikeMat}
-        </mesh>
-      )
   }
   return (
     <>
@@ -360,6 +377,7 @@ function Simulator() {
       const striker = {
         material: config.strikerMaterial, form: config.strikerForm,
         diameter_mm: currentStrikerDims.diameter_mm, height_mm: currentStrikerDims.height_mm,
+        sides: config.tubeCount,
       }
       const vImp = Math.max(0.02, vel * 0.15)   // normalized vel → m/s (sim regime)
       const f0 = tubeFrequencies(spec).f0

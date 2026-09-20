@@ -7,6 +7,7 @@ export interface StrikerSTLOptions {
   height_mm: number
   material?: string
   holeDiameter_mm?: number // default 2.0mm for chime suspension cord
+  tubeCount?: number
 }
 
 /**
@@ -19,6 +20,32 @@ export function buildStrikerGeometry(options: StrikerSTLOptions): THREE.BufferGe
   const holeR = Math.max(1, Math.min(outerR * 0.4, holeDiameter_mm / 2))
 
   switch (form) {
+    case 'multisided': {
+      // Regular polygon with as many sides as tubes (e.g. 6 tubes = hexagon)
+      const N = Math.max(3, options.tubeCount ?? 6)
+      const shape = new THREE.Shape()
+      for (let i = 0; i < N; i++) {
+        const a = (i + 0.5) * ((Math.PI * 2) / N)
+        const px = Math.cos(a) * outerR
+        const py = Math.sin(a) * outerR
+        if (i === 0) shape.moveTo(px, py); else shape.lineTo(px, py)
+      }
+      shape.closePath()
+      const hole = new THREE.Path()
+      hole.absarc(0, 0, holeR, 0, Math.PI * 2, true)
+      shape.holes.push(hole)
+      const geo = new THREE.ExtrudeGeometry(shape, {
+        depth: h,
+        bevelEnabled: true,
+        bevelThickness: Math.min(0.8, h * 0.15),
+        bevelSize: Math.min(0.8, (outerR - holeR) * 0.06),
+        bevelSegments: 2,
+      })
+      geo.center()
+      geo.computeVertexNormals()
+      return geo
+    }
+
     case 'sphere': {
       // Oblate spheroid dome with vertical central hole
       const pts: THREE.Vector2[] = []
@@ -53,7 +80,6 @@ export function buildStrikerGeometry(options: StrikerSTLOptions): THREE.BufferGe
     }
 
     case 'cylinder':
-    case 'disc':
     default: {
       // Extruded cylinder with central hole and subtle rounded edge bevel
       const shape = new THREE.Shape()

@@ -25,15 +25,19 @@ describe('contact: striker sizing & mass', () => {
 
   it('strikerVolume_m3 scales correctly across forms', () => {
     const d = 60, h = 20
-    const discVol = strikerVolume_m3('disc', d, h)
+    const cylVol = strikerVolume_m3('cylinder', d, h)
     const sphereVol = strikerVolume_m3('sphere', d, h)
     const donutVol = strikerVolume_m3('donut', d, h)
+    const hexVol = strikerVolume_m3('multisided', d, h, 6)
 
     // Sphere (oblate ellipsoid) is 2/3 the volume of bounding cylinder
-    expect(sphereVol / discVol).toBeCloseTo(2 / 3, 4)
+    expect(sphereVol / cylVol).toBeCloseTo(2 / 3, 4)
+
+    // Hexagon (6-gon) volume is (3*sqrt(3)/2) / pi ≈ 0.827 of bounding cylinder
+    expect(hexVol / cylVol).toBeCloseTo((3 * Math.sqrt(3) / 2) / Math.PI, 4)
 
     // Donut torus is less volume than solid cylinder
-    expect(donutVol).toBeLessThan(discVol)
+    expect(donutVol).toBeLessThan(cylVol)
     expect(donutVol).toBeGreaterThan(0)
   })
 
@@ -41,19 +45,20 @@ describe('contact: striker sizing & mass', () => {
     const targetMass_kg = 0.025 // 25 grams
     const dia_mm = 50
 
-    // Solve for hardwood disc
-    const h_disc = solveStrikerHeight_mm(targetMass_kg, 'hardWood', 'disc', dia_mm)
-    const calculatedMass_disc = strikerMass({
+    // Solve for hardwood multisided (6 tubes -> hexagon)
+    const h_hex = solveStrikerHeight_mm(targetMass_kg, 'hardWood', 'multisided', dia_mm, 6)
+    const calculatedMass_hex = strikerMass({
       material: 'hardWood',
-      form: 'disc',
+      form: 'multisided',
       diameter_mm: dia_mm,
-      height_mm: h_disc,
+      height_mm: h_hex,
+      sides: 6,
     })
-    expect(calculatedMass_disc).toBeCloseTo(targetMass_kg, 2)
+    expect(calculatedMass_hex).toBeCloseTo(targetMass_kg, 2)
 
-    // Solve for hardwood sphere dome (needs to be ~1.5x taller to match same mass)
+    // Solve for hardwood sphere dome (needs to be taller to match same mass)
     const h_sphere = solveStrikerHeight_mm(targetMass_kg, 'hardWood', 'sphere', dia_mm)
-    expect(h_sphere).toBeGreaterThan(h_disc)
+    expect(h_sphere).toBeGreaterThan(h_hex)
     const calculatedMass_sphere = strikerMass({
       material: 'hardWood',
       form: 'sphere',
@@ -67,16 +72,16 @@ describe('contact: striker sizing & mass', () => {
     const targetMass_kg = 0.05 // 50g
     const dia_mm = 55
 
-    const h_petg = solveStrikerHeight_mm(targetMass_kg, 'petg', 'disc', dia_mm)
-    const h_asa = solveStrikerHeight_mm(targetMass_kg, 'asa', 'disc', dia_mm)
+    const h_petg = solveStrikerHeight_mm(targetMass_kg, 'petg', 'multisided', dia_mm, 6)
+    const h_asa = solveStrikerHeight_mm(targetMass_kg, 'asa', 'multisided', dia_mm, 6)
 
     // Because ASA is less dense (1060 kg/m3) than PETG (1270 kg/m3), ASA must be thicker
     expect(h_asa).toBeGreaterThan(h_petg)
     expect(h_asa / h_petg).toBeCloseTo(1270 / 1060, 1)
 
     // Both calculate back to within a fraction of a gram of the target mass
-    const mass_petg = strikerMass({ material: 'petg', form: 'disc', diameter_mm: dia_mm, height_mm: h_petg })
-    const mass_asa = strikerMass({ material: 'asa', form: 'disc', diameter_mm: dia_mm, height_mm: h_asa })
+    const mass_petg = strikerMass({ material: 'petg', form: 'multisided', diameter_mm: dia_mm, height_mm: h_petg, sides: 6 })
+    const mass_asa = strikerMass({ material: 'asa', form: 'multisided', diameter_mm: dia_mm, height_mm: h_asa, sides: 6 })
     expect(mass_petg).toBeCloseTo(targetMass_kg, 2)
     expect(mass_asa).toBeCloseTo(targetMass_kg, 2)
   })
@@ -84,13 +89,13 @@ describe('contact: striker sizing & mass', () => {
 
 describe('stlExport: striker 3D mesh generation', () => {
   it('generates non-empty binary STL for all striker forms', () => {
-    const forms = ['disc', 'sphere', 'donut', 'cylinder']
+    const forms = ['multisided', 'sphere', 'donut', 'cylinder']
     for (const form of forms) {
       const bytes = generateStrikerSTL({
         form,
         diameter_mm: 55,
         height_mm: 20,
-        // tests default holeDiameter_mm = 2.0
+        tubeCount: 6,
       })
       // Binary STL has 80-byte header + 4-byte triangle count -> minimum 84 bytes
       expect(bytes.byteLength).toBeGreaterThan(1000)
@@ -172,5 +177,34 @@ describe('stlExport: striker 3D mesh generation', () => {
     const cylVol60 = strikerVolume_m3('cylinder', dia_mm, 60)
     expect(vol60).toBeGreaterThan(0)
     expect(vol60).toBeLessThan(cylVol60)
+  })
+
+  it('multisided striker generates polygons with as many sides as tubes', () => {
+    // 6 tubes -> hexagon
+    const bytes6 = generateStrikerSTL({
+      form: 'multisided',
+      diameter_mm: 50,
+      height_mm: 15,
+      tubeCount: 6,
+    })
+    expect(bytes6.byteLength).toBeGreaterThan(100)
+
+    // 8 tubes -> octagon
+    const bytes8 = generateStrikerSTL({
+      form: 'multisided',
+      diameter_mm: 50,
+      height_mm: 15,
+      tubeCount: 8,
+    })
+    expect(bytes8.byteLength).toBeGreaterThan(bytes6.byteLength) // more facets for 8-gon
+
+    // Volume scales with side count: 3-gon (triangle) < 6-gon (hexagon) < 8-gon (octagon)
+    const v3 = strikerVolume_m3('multisided', 50, 15, 3)
+    const v6 = strikerVolume_m3('multisided', 50, 15, 6)
+    const v8 = strikerVolume_m3('multisided', 50, 15, 8)
+    const vCyl = strikerVolume_m3('cylinder', 50, 15)
+    expect(v3).toBeLessThan(v6)
+    expect(v6).toBeLessThan(v8)
+    expect(v8).toBeLessThan(vCyl)
   })
 })
