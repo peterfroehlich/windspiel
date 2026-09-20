@@ -165,24 +165,31 @@ describe('tubeSuspension & sameAbsoluteSuspension', () => {
     }
   })
 
-  it('per-tube override takes precedence over both relative and same-absolute suspension', () => {
+  it('per-tube override in absolute mm takes precedence over relative and same-absolute suspension', () => {
+    st().setTubeOverride(2, { suspension_mm: 88.5 })
+    const { config, tubes } = st()
+    const susp2 = tubeSuspension(config, tubes, 2)
+    expect(susp2.mm).toBe(88.5)
+    expect(susp2.fraction).toBeCloseTo(88.5 / tubes[2].length_mm, 4)
+
+    // When sameAbsoluteSuspension is toggled on, tube 2 still keeps its manual mm override
+    st().setConfig({ sameAbsoluteSuspension: true })
+    const susp2Abs = tubeSuspension(st().config, st().tubes, 2)
+    expect(susp2Abs.mm).toBe(88.5)
+
+    // Resetting override reverts to standard calculation
+    st().setTubeOverride(2, { suspension_mm: undefined })
+    const susp2Reset = tubeSuspension(st().config, st().tubes, 2)
+    const targetMm = st().tubes[0].length_mm * st().config.suspensionPoint
+    expect(susp2Reset.mm).toBeCloseTo(targetMm, 2)
+  })
+
+  it('legacy per-tube fraction override is also supported', () => {
     st().setTubeOverride(2, { suspensionPoint: 0.32 })
     const { config, tubes } = st()
     const susp2 = tubeSuspension(config, tubes, 2)
     expect(susp2.fraction).toBeCloseTo(0.32, 4)
     expect(susp2.mm).toBeCloseTo(tubes[2].length_mm * 0.32, 2)
-
-    // When sameAbsoluteSuspension is toggled on, tube 2 still keeps its manual override
-    st().setConfig({ sameAbsoluteSuspension: true })
-    const susp2Abs = tubeSuspension(st().config, st().tubes, 2)
-    expect(susp2Abs.fraction).toBeCloseTo(0.32, 4)
-    expect(susp2Abs.mm).toBeCloseTo(st().tubes[2].length_mm * 0.32, 2)
-
-    // Resetting override reverts to standard calculation
-    st().setTubeOverride(2, { suspensionPoint: undefined })
-    const susp2Reset = tubeSuspension(st().config, st().tubes, 2)
-    const targetMm = st().tubes[0].length_mm * st().config.suspensionPoint
-    expect(susp2Reset.mm).toBeCloseTo(targetMm, 2)
   })
 })
 

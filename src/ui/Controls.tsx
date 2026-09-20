@@ -472,7 +472,7 @@ function TubesSection() {
             const o = config.tubeOverrides[i] ?? {}
             const g = tubeGeometry(config, i)
             const susp = tubeSuspension(config, tubes, i)
-            const overridden = o.material || o.outerDiameter_mm || o.wallThickness_mm || o.solid !== undefined || o.suspensionPoint !== undefined
+            const overridden = o.material || o.outerDiameter_mm || o.wallThickness_mm || o.solid !== undefined || o.suspension_mm !== undefined || o.suspensionPoint !== undefined
             return (
               <div key={i} className={'adv-tube' + (overridden ? ' ovr' : '')}>
                 <div className="adv-head">
@@ -486,7 +486,8 @@ function TubesSection() {
                         outerDiameter_mm: config.outerDiameter_mm,
                         wallThickness_mm: config.wallThickness_mm,
                         solid: config.solid,
-                        suspensionPoint: config.suspensionPoint,
+                        suspension_mm: undefined,
+                        suspensionPoint: undefined,
                       })}>
                       ⟲
                     </button>
@@ -524,10 +525,13 @@ function TubesSection() {
                 </div>
                 <div className="adv-row">
                   <span className="adv-label">Susp</span>
-                  <input type="range" min={0.1} max={0.5} step={0.005}
-                    value={o.suspensionPoint ?? config.suspensionPoint}
-                    onChange={(e) => setTubeOverride(i, { suspensionPoint: parseFloat(e.target.value) })} />
-                  <span className="adv-val">{((susp.fraction) * 100).toFixed(1)}%</span>
+                  <input type="range"
+                    min={5}
+                    max={Math.max(50, Math.round(t.length_mm * 0.5))}
+                    step={0.5}
+                    value={Math.round((o.suspension_mm ?? susp.mm) * 2) / 2}
+                    onChange={(e) => setTubeOverride(i, { suspension_mm: parseFloat(e.target.value) })} />
+                  <span className="adv-val">{susp.mm.toFixed(1)} mm</span>
                 </div>
               </div>
             )

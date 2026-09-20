@@ -16,7 +16,8 @@ export interface TubeOverride {
   outerDiameter_mm?: number
   wallThickness_mm?: number
   solid?: boolean
-  suspensionPoint?: number       // 0..0.5 fraction of length
+  suspension_mm?: number        // absolute suspension distance from tube top in mm
+  suspensionPoint?: number      // legacy fraction fallback
 }
 
 export interface ChimeConfig {
@@ -153,7 +154,14 @@ export function tubeSuspension(
   const tube = tubes[index]
   const L_mm = tube ? tube.length_mm : 300
 
-  // 1. Per-tube override wins
+  // 1. Per-tube override in absolute mm wins
+  if (o.suspension_mm !== undefined) {
+    const mm = o.suspension_mm
+    const fraction = L_mm > 0 ? mm / L_mm : config.suspensionPoint
+    return { fraction, mm }
+  }
+
+  // Legacy per-tube fraction override fallback
   if (o.suspensionPoint !== undefined) {
     const fraction = o.suspensionPoint
     return { fraction, mm: fraction * L_mm }
@@ -268,6 +276,8 @@ export const useStore = create<State>((set) => ({
     if (g.outerDiameter_mm === s.config.outerDiameter_mm) delete g.outerDiameter_mm
     if (g.wallThickness_mm === s.config.wallThickness_mm) delete g.wallThickness_mm
     if (g.solid === s.config.solid) delete g.solid
+    if (o.suspension_mm === undefined && 'suspension_mm' in o) delete g.suspension_mm
+    if (o.suspensionPoint === undefined && 'suspensionPoint' in o) delete g.suspensionPoint
     if (g.suspensionPoint === s.config.suspensionPoint) delete g.suspensionPoint
     const tubes = computeTubes(c)
     return { config: c, tubes }

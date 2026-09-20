@@ -165,7 +165,7 @@ body { font-family: system-ui, sans-serif; color: #dfe3ea; }
   flex: 1; min-width: 0; background: #1a2130; color: #dfe3ea;
   border: 1px solid #2a3242; border-radius: 4px; padding: 2px 4px; font-size: 11px;
 }
-.adv-val { width: 44px; flex: none; text-align: right; font-size: 10px; color: #aeb8cc; font-variant-numeric: tabular-nums; }
+.adv-val { min-width: 48px; width: auto; flex: none; text-align: right; font-size: 10px; color: #aeb8cc; font-variant-numeric: tabular-nums; }
 
 .row { display: flex; align-items: center; gap: 8px; margin: 6px 0; }
 .row .label { width: 92px; flex: none; font-size: 11px; color: #8892a6; }
