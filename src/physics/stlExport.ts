@@ -37,10 +37,16 @@ export function buildStrikerGeometry(options: StrikerSTLOptions): THREE.BufferGe
     }
 
     case 'donut': {
-      // Torus ring with central aperture
-      const r_minor = Math.max(2, h / 2)
-      const R_major = Math.max(outerR * 0.35, outerR - r_minor)
+      // Torus ring with central cord hole: inner aperture is preserved >= minHoleR
+      const minHoleR = Math.max(holeR, 1.0)
+      const maxMinor = Math.max(1.0, (outerR - minHoleR) / 2)
+      const r_minor = Math.min(h / 2, maxMinor)
+      const R_major = outerR - r_minor
+      const scaleZ = h / (2 * r_minor)
       const geo = new THREE.TorusGeometry(R_major, r_minor, 32, 64)
+      if (Math.abs(scaleZ - 1.0) > 0.001) {
+        geo.scale(1, 1, scaleZ)
+      }
       geo.rotateX(Math.PI / 2)
       geo.computeVertexNormals()
       return geo

@@ -149,14 +149,20 @@ function Striker({ dropY }: { dropY: number }) {
         </mesh>
       )
       break
-    case 'donut':    // torus ring: minor radius (thickness) follows the slider
+    case 'donut': {  // torus ring: minor radius follows slider, preserving central cord hole
+      const minHoleR = Math.max(0.001, Math.min(R * 0.25, 0.0015))
+      const maxMinor = Math.max(0.001, (R - minHoleR) / 2)
+      const r_minor = Math.min(h / 2, maxMinor)
+      const R_major = R - r_minor
+      const scaleZ = h / (2 * r_minor)
       strikerMesh = (
-        <mesh castShadow rotation={[Math.PI / 2, 0, 0]}>
-          <torusGeometry args={[Math.max(R * 0.35, R - h / 2), Math.max(0.004, h / 2), 16, 40]} />
+        <mesh castShadow rotation={[Math.PI / 2, 0, 0]} scale={[1, 1, scaleZ]}>
+          <torusGeometry args={[R_major, r_minor, 24, 48]} />
           {strikeMat}
         </mesh>
       )
       break
+    }
     case 'cylinder': // clean cylinder (sharp-rim character is in the contact physics)
       strikerMesh = (
         <mesh castShadow>

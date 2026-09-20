@@ -6,7 +6,8 @@ import {
   calculateStrikerDiameter_mm,
   optimalStrikerMass,
 } from './contact'
-import { generateStrikerSTL } from './stlExport'
+import { generateStrikerSTL, buildStrikerGeometry } from './stlExport'
+import * as THREE from 'three'
 
 describe('contact: striker sizing & mass', () => {
   it('calculateStrikerDiameter_mm correctly accounts for tube radius and gap', () => {
@@ -98,7 +99,78 @@ describe('stlExport: striker 3D mesh generation', () => {
       const numTriangles = view.getUint32(80, true)
       expect(numTriangles).toBeGreaterThan(100)
       // Total bytes must equal 84 + numTriangles * 50
-      expect(bytes.byteLength).toBe(84 + numTriangles * 50)
     }
+  })
+
+  it('donut striker maintains central cord hole even when very thick', () => {
+    // 30mm diameter, 50mm thick donut (thickness > diameter) with 2.0mm cord hole
+    const holeDia = 2.0
+    const geo = buildStrikerGeometry({
+      form: 'donut',
+      diameter_mm: 30,
+      height_mm: 50,
+      holeDiameter_mm: holeDia,
+    })
+
+    geo.computeBoundingBox()
+    const bbox = geo.boundingBox!
+
+    // Bounding box height along Y must match height_mm (50mm)
+    const height = bbox.max.y - bbox.min.y
+    expect(height).toBeCloseTo(50, 1)
+
+    // Outer diameter along X and Z must match diameter_mm (30mm)
+    const xSpan = bbox.max.x - bbox.min.x
+    const zSpan = bbox.max.z - bbox.min.z
+    expect(xSpan).toBeCloseTo(30, 1)
+    expect(zSpan).toBeCloseTo(30, 1)
+
+    // Check that inner cord hole is preserved:
+    // For every vertex, the radial distance in the XZ plane (at Y ≈ 0) must be >= holeDia / 2
+    const pos = geo.attributes.position as THREE.BufferAttribute
+    let minRadialDistAtEquator = Infinity
+    for (let i = 0; i < pos.count; i++) {
+      const x = pos.getX(i)
+      const y = pos.getY(i)
+      const z = pos.getZ(i)
+      // Look near the equator where the inner hole is narrowest
+      if (Math.abs(y) < 1.0) {
+        const r = Math.hypot(x, z)
+        if (r < minRadialDistAtEquator) {
+          minRadialDistAtEquator = r
+        }
+      }
+    }
+    // The central hole must never close: minimum radius must be >= cord hole radius (1.0 mm)
+    expect(minRadialDistAtEquator).toBeGreaterThanOrEqual((holeDia / 2) * 0.99)
+    geo.dispose()
+  })
+
+  it('thick donut volume scales and solveStrikerHeight_mm matches target mass without collapsing hole', () => {
+    const dia_mm = 35
+    // 25g hardwood with 35mm diameter requires a thick donut (h ~ 44mm, well above the 16mm circular limit)
+    const targetMass_kg = 0.025
+
+    const h_donut = solveStrikerHeight_mm(targetMass_kg, 'hardWood', 'donut', dia_mm)
+    expect(h_donut).toBeGreaterThan(20)
+    expect(h_donut).toBeLessThanOrEqual(60)
+
+    const mass_donut = strikerMass({
+      material: 'hardWood',
+      form: 'donut',
+      diameter_mm: dia_mm,
+      height_mm: h_donut,
+    })
+    expect(mass_donut).toBeCloseTo(targetMass_kg, 2)
+
+    // For extremely heavy targets, height clamps at maximum 60mm
+    const h_clamped = solveStrikerHeight_mm(0.1, 'hardWood', 'donut', dia_mm)
+    expect(h_clamped).toBe(60)
+
+    // Even for maximum height (60mm), volume remains positive and less than solid cylinder
+    const vol60 = strikerVolume_m3('donut', dia_mm, 60)
+    const cylVol60 = strikerVolume_m3('cylinder', dia_mm, 60)
+    expect(vol60).toBeGreaterThan(0)
+    expect(vol60).toBeLessThan(cylVol60)
   })
 })

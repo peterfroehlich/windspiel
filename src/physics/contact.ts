@@ -94,10 +94,14 @@ export function strikerVolume_m3(form: string, diameter_mm: number, height_mm: n
       // Oblate ellipsoid: semi-axes r, h/2, r -> V = 4/3 * pi * r * r * (h/2) = 2/3 * pi * r^2 * h
       return (2 / 3) * Math.PI * r * r * h
     case 'donut': {
-      // Torus ring: outer radius r, minor radius r_minor = h/2, major radius R_major = max(r * 0.35, r - h/2)
-      const r_minor = Math.max(0.002, h / 2)
-      const R_major = Math.max(r * 0.35, r - r_minor)
-      return 2 * Math.PI * Math.PI * R_major * r_minor * r_minor
+      // Torus ring: outer radius r, vertical height h, inner cord hole >= r_min_hole
+      const r_min_hole = Math.max(0.001, Math.min(r * 0.25, 0.0015))
+      const max_minor = Math.max(0.001, (r - r_min_hole) / 2)
+      const r_minor = Math.min(h / 2, max_minor)
+      const R_major = r - r_minor
+      // Volume by Pappus's centroid theorem for elliptical-cross-section torus:
+      // V = 2 * pi * R_major * (pi * r_minor * (h / 2)) = pi^2 * R_major * r_minor * h
+      return Math.PI * Math.PI * R_major * r_minor * h
     }
     case 'cylinder':
     case 'disc':
@@ -133,18 +137,32 @@ export function solveStrikerHeight_mm(
       h_m = targetVol / ((2 / 3) * Math.PI * r * r)
       break
     case 'donut': {
-      let h = Math.sqrt((2 * targetVol) / (Math.PI * Math.PI * r))
-      for (let i = 0; i < 4; i++) {
-        const r_minor = h / 2
-        const R_major = Math.max(r * 0.35, r - r_minor)
-        const v = 2 * Math.PI * Math.PI * R_major * r_minor * r_minor
-        const diff = v - targetVol
-        const dv_dh = Math.PI * Math.PI * r * h
-        if (Math.abs(diff) < 1e-8 || dv_dh <= 0) break
-        h -= diff / dv_dh
-        h = Math.max(0.004, Math.min(r * 1.5, h))
+      const r_min_hole = Math.max(0.001, Math.min(r * 0.25, 0.0015))
+      const max_minor = Math.max(0.001, (r - r_min_hole) / 2)
+      const h_transition = 2 * max_minor
+      const R_major_fixed = r - max_minor
+      const v_transition = Math.PI * Math.PI * R_major_fixed * max_minor * h_transition
+
+      if (targetVol >= v_transition) {
+        // Thick donut regime: volume is linear with h
+        // V = pi^2 * R_major_fixed * max_minor * h
+        const unitVolPerMeter = Math.PI * Math.PI * R_major_fixed * max_minor
+        h_m = unitVolPerMeter > 0 ? targetVol / unitVolPerMeter : h_transition
+      } else {
+        // Circular torus regime: targetVol < v_transition
+        let h = Math.sqrt((2 * targetVol) / (Math.PI * Math.PI * r))
+        for (let i = 0; i < 6; i++) {
+          const r_minor = h / 2
+          const R_major = r - r_minor
+          const v = 2 * Math.PI * Math.PI * R_major * r_minor * r_minor
+          const diff = v - targetVol
+          const dv_dh = Math.PI * Math.PI * h * (r - 0.75 * h)
+          if (Math.abs(diff) < 1e-9 || dv_dh <= 0) break
+          h -= diff / dv_dh
+          h = Math.max(0.004, Math.min(h_transition, h))
+        }
+        h_m = h
       }
-      h_m = h
       break
     }
     case 'cylinder':
