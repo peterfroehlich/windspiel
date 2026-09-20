@@ -215,6 +215,7 @@ type SectionId =
   | 'mfgOverview'
   | 'mfgTuning'
   | 'mfgCalibration'
+  | 'mfgStriker'
 
 /** Collapsible sidebar section. Multiple sections can be open at once and the
  *  sidebar scrolls. Folded sections unmount (cheap) — all values are derived
@@ -352,6 +353,7 @@ export function Controls() {
     mfgOverview: true,
     mfgTuning: true,
     mfgCalibration: true,
+    mfgStriker: true,
   })
   const toggle = (id: SectionId) => setOpen((o) => ({ ...o, [id]: !o[id] }))
 
@@ -1240,62 +1242,6 @@ function ManufacturingTab({
             {copied ? '✓ Copied' : '📋 Copy cut list'}
           </button>
         </div>
-
-        {/* ────────────────── Striker 3D Print / Fabrication (STL) ────────────────── */}
-        <div className="mfg-striker-card">
-          <div className="mfg-striker-header">
-            <div className="mfg-striker-title">
-              <span>🖨️ Striker 3D Print / Fabrication (STL)</span>
-            </div>
-            <span className="mfg-striker-badge">
-              {mfgStrikerForm} • {mfgStrikerMat}
-            </span>
-          </div>
-
-          <div className="mfg-striker-grid">
-            <div className="mfg-striker-prop">
-              <span className="mfg-prop-label">Diameter:</span>
-              <strong>Ø {mfgStrikerDims.diameter_mm} mm</strong>
-            </div>
-            <div className="mfg-striker-prop">
-              <span className="mfg-prop-label">Thickness:</span>
-              <strong>{mfgStrikerDims.height_mm} mm</strong>
-            </div>
-            <div className="mfg-striker-prop">
-              <span className="mfg-prop-label">Target Mass:</span>
-              <strong>{mfgOptimalMass.toFixed(0)} g</strong>
-              <span className="mfg-prop-sub">({mfgCurrentMass.toFixed(0)} g calc)</span>
-            </div>
-            <div className="mfg-striker-prop" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-              <span className="mfg-prop-label">Cord hole:</span>
-              <input
-                type="number"
-                step="0.5"
-                min="1"
-                max="10"
-                value={cordHoleMm}
-                onChange={(e) => setCordHoleMm(e.target.value)}
-                className="mfg-hole-input"
-                title="Central cord hole diameter in mm"
-              />
-              <span style={{ fontSize: 10, color: '#7b88a1' }}>mm</span>
-            </div>
-          </div>
-
-          <div className="mfg-striker-actions">
-            <button
-              type="button"
-              className="mfg-stl-btn"
-              onClick={handleDownloadSTL}
-              title={`Download 3D printable binary STL: Ø${mfgStrikerDims.diameter_mm}mm × ${mfgStrikerDims.height_mm}mm ${mfgStrikerForm}`}
-            >
-              {stlExported ? '✓ STL Downloaded!' : '💾 Download Striker STL'}
-            </button>
-            <div className="mfg-striker-hint">
-              Watertight 3D model with central suspension cord hole. Ready to slice for 3D printing (PETG/PLA) or lathe/turning.
-            </div>
-          </div>
-        </div>
       </Section>
 
       {/* ────────────────── Section 2: Tuning Tool ────────────────── */}
@@ -1627,6 +1573,64 @@ function ManufacturingTab({
               )}
             </div>
           )}
+        </div>
+      </Section>
+
+      {/* ────────────────── Section 4: Striker STL Download ────────────────── */}
+      <Section id="mfgStriker" title="Striker STL Download" open={open} toggle={toggle}>
+        <div className="mfg-striker-card" style={{ marginTop: 0 }}>
+          <div className="mfg-striker-header">
+            <div className="mfg-striker-title">
+              <span>🖨️ Striker 3D Print / Fabrication (STL)</span>
+            </div>
+            <span className="mfg-striker-badge">
+              {mfgStrikerForm} • {mfgStrikerMat}
+            </span>
+          </div>
+
+          <div className="mfg-striker-grid">
+            <div className="mfg-striker-prop">
+              <span className="mfg-prop-label">Diameter:</span>
+              <strong>Ø {mfgStrikerDims.diameter_mm} mm</strong>
+            </div>
+            <div className="mfg-striker-prop">
+              <span className="mfg-prop-label">Thickness:</span>
+              <strong>{mfgStrikerDims.height_mm} mm</strong>
+            </div>
+            <div className="mfg-striker-prop">
+              <span className="mfg-prop-label">Target Mass:</span>
+              <strong>{mfgOptimalMass.toFixed(0)} g</strong>
+              <span className="mfg-prop-sub">({mfgCurrentMass.toFixed(0)} g calc)</span>
+            </div>
+            <div className="mfg-striker-prop" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+              <span className="mfg-prop-label">Cord hole:</span>
+              <input
+                type="number"
+                step="0.5"
+                min="1"
+                max="10"
+                value={cordHoleMm}
+                onChange={(e) => setCordHoleMm(e.target.value)}
+                className="mfg-hole-input"
+                title="Central cord hole diameter in mm"
+              />
+              <span style={{ fontSize: 10, color: '#7b88a1' }}>mm</span>
+            </div>
+          </div>
+
+          <div className="mfg-striker-actions">
+            <button
+              type="button"
+              className="mfg-stl-btn"
+              onClick={handleDownloadSTL}
+              title={`Download 3D printable binary STL: Ø${mfgStrikerDims.diameter_mm}mm × ${mfgStrikerDims.height_mm}mm ${mfgStrikerForm}`}
+            >
+              {stlExported ? '✓ STL Downloaded!' : '💾 Download Striker STL'}
+            </button>
+            <div className="mfg-striker-hint">
+              Watertight 3D model with central suspension cord hole. Ready to slice for 3D printing (PETG/PLA) or lathe/turning.
+            </div>
+          </div>
         </div>
       </Section>
     </>
