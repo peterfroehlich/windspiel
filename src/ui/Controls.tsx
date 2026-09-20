@@ -14,6 +14,9 @@ import { HELP } from './help'
 import { PhysicsModal } from './PhysicsModal'
 import { DEFAULT_CONFIG } from '../state/store'
 import { listPresets as presetsList, savePreset, loadPreset, deletePreset } from '../state/presets'
+import { estimateCut, freqToNote } from '../physics/tuning'
+import { AudioPitchTracker } from '../audio/pitchDetector'
+
 
 /** Config keys accepted on import (subset check against foreign JSON). */
 const DEFAULT_CONFIG_KEYS = Object.keys(DEFAULT_CONFIG) as (keyof typeof DEFAULT_CONFIG)[]
@@ -762,6 +765,18 @@ function ManufacturingSection() {
   const [canScrollRight, setCanScrollRight] = useState(false)
   const [canScrollLeft, setCanScrollLeft] = useState(false)
 
+  // Tuning & Analysis tool state
+  const [selectedTubeIndex, setSelectedTubeIndex] = useState(0)
+  const [isListening, setIsListening] = useState(false)
+  const [liveFreq, setLiveFreq] = useState<number | null>(null)
+  const [liveRms, setLiveRms] = useState(0)
+  const [capturedFreq, setCapturedFreq] = useState<number | null>(null)
+  const [manualFreqInput, setManualFreqInput] = useState<string>('')
+  const [customLengthInput, setCustomLengthInput] = useState<string>('')
+  const [micError, setMicError] = useState<string | null>(null)
+
+  const trackerRef = useRef<AudioPitchTracker | null>(null)
+
   const checkScroll = () => {
     const el = wrapRef.current
     if (!el) return
@@ -802,6 +817,109 @@ function ManufacturingSection() {
     setTimeout(() => setCopied(false), 2000)
   }
 
+  // Active tube selection
+  const activeIdx = Math.min(selectedTubeIndex, Math.max(0, tubes.length - 1))
+  const activeTube = tubes[activeIdx]
+  const targetFreq = activeTube?.freq ?? 440
+  const designedLength_mm = activeTube ? activeTube.length_mm : 300
+
+  // Physical length used for calculation (custom length if user entered one, else designed length)
+  const currentLength_mm = parseFloat(customLengthInput) > 0
+    ? parseFloat(customLengthInput)
+    : designedLength_mm
+
+  // Update pitch tracker target when tube changes
+  useEffect(() => {
+    if (trackerRef.current) {
+      trackerRef.current.setTargetFreq(targetFreq)
+    }
+  }, [targetFreq])
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (trackerRef.current) {
+        trackerRef.current.stop()
+        trackerRef.current = null
+      }
+    }
+  }, [])
+
+  const startMic = async () => {
+    setMicError(null)
+    setCapturedFreq(null)
+    setLiveFreq(null)
+
+    const tracker = new AudioPitchTracker({
+      onLiveUpdate: ({ freq, rms }) => {
+        setLiveRms(rms)
+        if (freq) {
+          setLiveFreq(freq)
+        }
+      },
+      onStrikeDetected: (freq) => {
+        setCapturedFreq(freq)
+        setManualFreqInput(freq.toFixed(1))
+      },
+      onError: (err) => {
+        setMicError(err.message || 'Microphone access denied')
+        setIsListening(false)
+      },
+    })
+    tracker.setTargetFreq(targetFreq)
+    trackerRef.current = tracker
+
+    try {
+      await tracker.start()
+      setIsListening(true)
+    } catch (e: any) {
+      setMicError(e?.message || 'Could not start microphone')
+      setIsListening(false)
+    }
+  }
+
+  const stopMic = () => {
+    if (trackerRef.current) {
+      trackerRef.current.stop()
+      trackerRef.current = null
+    }
+    setIsListening(false)
+    setLiveRms(0)
+  }
+
+  const toggleMic = () => {
+    if (isListening) stopMic()
+    else startMic()
+  }
+
+  // Active frequency to analyze: manual typed input || strike captured || live
+  const parsedManual = parseFloat(manualFreqInput)
+  const measuredFreq = parsedManual > 0
+    ? parsedManual
+    : (capturedFreq ?? liveFreq ?? 0)
+
+  const cutEstimate = estimateCut(measuredFreq, targetFreq, currentLength_mm)
+  const noteInfo = freqToNote(measuredFreq)
+
+  // Calculate new suspension hole position
+  const newLength_mm = cutEstimate.targetLength_mm
+  const newSusp_mm = config.sameAbsoluteSuspension
+    ? tubeSuspension(config, tubes, 0).mm
+    : newLength_mm * tubeSuspension(config, tubes, activeIdx).fraction
+
+  // Cents needle position: clamp between -50 and +50 cents, map to 0% .. 100%
+  const centsDeviation = measuredFreq > 0
+    ? 1200 * Math.log2(measuredFreq / targetFreq)
+    : 0
+  const clampedCents = Math.max(-50, Math.min(50, centsDeviation))
+  const needlePercent = 50 + (clampedCents / 50) * 50
+
+  const needleColor = Math.abs(centsDeviation) <= 5
+    ? '#7ddb91' // in tune
+    : centsDeviation < 0
+      ? '#6c8cff' // flat (needs cut)
+      : '#ff8a65' // sharp (too short)
+
   return (
     <div className="mfg-section">
       <div className="mfg-container">
@@ -834,8 +952,19 @@ function ManufacturingSection() {
                 const matLabel = MATERIALS[g.material]?.label ?? g.material
                 const dia_mm = (g.Do * 1000).toFixed(1)
                 const wall_mm = g.solid ? 'solid' : (g.t * 1000).toFixed(2) + ' mm'
+                const isSelected = activeIdx === i
                 return (
-                  <tr key={i}>
+                  <tr
+                    key={i}
+                    className={isSelected ? 'mfg-row-active' : ''}
+                    onClick={() => {
+                      setSelectedTubeIndex(i)
+                      setCapturedFreq(null)
+                      setManualFreqInput('')
+                      setCustomLengthInput('')
+                    }}
+                    title={`Click to select Tube #${i + 1} (${t.note}) for tuning analysis`}
+                  >
                     <td>
                       <span className="mfg-idx">#{i + 1}</span>{' '}
                       <span className="mfg-note">{t.note}</span>
@@ -861,6 +990,237 @@ function ManufacturingSection() {
         <button className="mini-action-btn" onClick={copyCutList} title="Copy cut list to clipboard (tab-separated)">
           {copied ? '✓ Copied' : '📋 Copy cut list'}
         </button>
+      </div>
+
+      {/* ────────────────── Frequency Analysis & Cut Tool ────────────────── */}
+      <div className="mfg-analyzer">
+        <div className="mfg-analyzer-header">
+          <div className="mfg-analyzer-title">
+            <span>🔬 Tuning & Cut Tool</span>
+          </div>
+          <span className="mfg-analyzer-badge">
+            Tube #{activeIdx + 1} • {activeTube?.note}
+          </span>
+        </div>
+
+        {/* Tube picker row */}
+        <div className="mfg-select-row">
+          <label htmlFor="mfg-tube-pick">Select tube:</label>
+          <select
+            id="mfg-tube-pick"
+            className="mfg-tube-select"
+            value={activeIdx}
+            onChange={(e) => {
+              const idx = parseInt(e.target.value, 10)
+              setSelectedTubeIndex(idx)
+              setCapturedFreq(null)
+              setManualFreqInput('')
+              setCustomLengthInput('')
+            }}
+          >
+            {tubes.map((t, i) => (
+              <option key={i} value={i}>
+                #{i + 1} {t.note} ({t.freq.toFixed(1)} Hz) — design {t.length_mm.toFixed(1)} mm
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {/* Microphone controls */}
+        <div className="mfg-mic-controls">
+          <button
+            className={`mfg-mic-btn ${isListening ? 'active' : ''}`}
+            onClick={toggleMic}
+            title={isListening ? 'Stop microphone' : 'Enable microphone to analyze tube strike frequency'}
+          >
+            {isListening ? (
+              <>
+                <span style={{ fontSize: 10 }}>🔴</span> Listening... (Click to stop)
+              </>
+            ) : (
+              <>
+                <span>🎙️</span> Enable Microphone
+              </>
+            )}
+          </button>
+        </div>
+
+        {/* Live VU meter */}
+        {isListening && (
+          <div className="mfg-vu-meter" title={`Input level: ${(liveRms * 100).toFixed(0)}%`}>
+            <div
+              className="mfg-vu-bar"
+              style={{ width: `${Math.min(100, liveRms * 350)}%` }}
+            />
+          </div>
+        )}
+
+        {micError && (
+          <div className="mfg-hint" style={{ color: '#ff8a65', background: 'rgba(255, 138, 101, 0.1)', padding: '4px 6px', borderRadius: 4 }}>
+            ⚠️ {micError}
+          </div>
+        )}
+
+        {/* Tuner Box */}
+        <div className="mfg-tuner-box">
+          <div className="mfg-tuner-readout">
+            <div className="mfg-freq-live">
+              {measuredFreq > 0 ? (
+                <>
+                  {measuredFreq.toFixed(1)} <span className="mfg-freq-unit">Hz</span>
+                </>
+              ) : (
+                <span style={{ fontSize: 13, color: '#7b88a1', fontWeight: 400 }}>
+                  {isListening ? 'Strike tube to detect frequency...' : 'Microphone inactive'}
+                </span>
+              )}
+            </div>
+            <div className="mfg-target-hint">
+              Target: <strong>{targetFreq.toFixed(1)} Hz</strong> ({activeTube?.note})
+            </div>
+          </div>
+
+          {/* Deviation Gauge */}
+          <div className="mfg-cents-gauge" title={measuredFreq > 0 ? `${centsDeviation > 0 ? '+' : ''}${centsDeviation.toFixed(1)} cents` : 'Tuning needle'}>
+            <div className="mfg-gauge-center" />
+            <div className="mfg-gauge-sweet-spot" />
+            {measuredFreq > 0 && (
+              <div
+                className="mfg-gauge-needle"
+                style={{
+                  left: `${needlePercent}%`,
+                  backgroundColor: needleColor,
+                  boxShadow: `0 0 6px ${needleColor}`,
+                }}
+              />
+            )}
+          </div>
+          <div className="mfg-gauge-labels">
+            <span>−50¢ (Flat)</span>
+            <span>0¢</span>
+            <span>+50¢ (Sharp)</span>
+          </div>
+        </div>
+
+        {/* Strike capture banner */}
+        {capturedFreq && (
+          <div className="mfg-strike-banner">
+            <span>🎯 Strike locked: <strong>{capturedFreq.toFixed(1)} Hz</strong> ({noteInfo.note})</span>
+            <button
+              onClick={() => {
+                setCapturedFreq(null)
+                setManualFreqInput('')
+              }}
+              title="Clear locked strike frequency and re-measure"
+            >
+              Re-measure ↺
+            </button>
+          </div>
+        )}
+
+        {/* Length inputs */}
+        <div className="mfg-length-input-row">
+          <span title="Physical length of your rough-cut tube before trimming">Current tube length:</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+            <input
+              type="number"
+              step="0.5"
+              placeholder={designedLength_mm.toFixed(1)}
+              value={customLengthInput}
+              onChange={(e) => setCustomLengthInput(e.target.value)}
+              title="Enter rough measured length in mm (default: designed length)"
+            />
+            <span style={{ color: '#7b88a1', fontSize: 10 }}>mm</span>
+            {customLengthInput && (
+              <button
+                className="mini-action-btn"
+                style={{ padding: '1px 5px', fontSize: 9 }}
+                onClick={() => setCustomLengthInput('')}
+                title="Reset to designed length"
+              >
+                Reset
+              </button>
+            )}
+          </div>
+        </div>
+
+        <div className="mfg-length-input-row">
+          <span title="Measured frequency in Hz (updated by mic or manual entry)">Measured frequency:</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+            <input
+              type="number"
+              step="0.1"
+              placeholder={measuredFreq > 0 ? measuredFreq.toFixed(1) : 'e.g. 510.5'}
+              value={manualFreqInput}
+              onChange={(e) => {
+                setManualFreqInput(e.target.value)
+                setCapturedFreq(null)
+              }}
+              title="Enter measured frequency in Hz manually or use microphone"
+            />
+            <span style={{ color: '#7b88a1', fontSize: 10 }}>Hz</span>
+            {manualFreqInput && (
+              <button
+                className="mini-action-btn"
+                style={{ padding: '1px 5px', fontSize: 9 }}
+                onClick={() => {
+                  setManualFreqInput('')
+                  setCapturedFreq(null)
+                }}
+                title="Clear manual frequency"
+              >
+                Clear
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Cut Recommendation Card */}
+        {measuredFreq > 0 ? (
+          <div className={`mfg-cut-card ${cutEstimate.status}`}>
+            <div className="mfg-cut-primary">
+              <div className="mfg-cut-amount">
+                {cutEstimate.status === 'in_tune' && (
+                  <><span>✓</span> In Tune (±{Math.abs(cutEstimate.cents).toFixed(1)}¢)</>
+                )}
+                {cutEstimate.status === 'flat' && (
+                  <><span>✂️</span> Cut off: <strong>{cutEstimate.cutAmount_mm.toFixed(1)} mm</strong></>
+                )}
+                {cutEstimate.status === 'sharp' && (
+                  <><span>⚠️</span> Too short by {Math.abs(cutEstimate.cutAmount_mm).toFixed(1)} mm</>
+                )}
+              </div>
+              <span
+                className="mfg-analyzer-badge"
+                style={{
+                  color: needleColor,
+                  borderColor: needleColor,
+                  background: `${needleColor}20`,
+                }}
+              >
+                {cutEstimate.status === 'in_tune' ? 'Exact' : cutEstimate.status === 'flat' ? 'Flat' : 'Sharp'}
+              </span>
+            </div>
+
+            <div className="mfg-cut-details">
+              <div>New cut length: <strong>{newLength_mm.toFixed(1)} mm</strong></div>
+              <div>Susp. hole: <strong>{newSusp_mm.toFixed(1)} mm</strong> from top</div>
+              <div>Target pitch: <strong>{targetFreq.toFixed(1)} Hz</strong> ({activeTube?.note})</div>
+              <div>Pitch offset: <strong>{centsDeviation > 0 ? '+' : ''}{centsDeviation.toFixed(1)} cents</strong></div>
+            </div>
+
+            {cutEstimate.status === 'sharp' && (
+              <div className="mfg-hint" style={{ color: '#ff9e80', marginTop: 4 }}>
+                Tube is vibrating higher than target. Shortening further will raise the pitch.
+                To lower pitch: sand or grind the center antinode wall thinner, or reassign to a higher note.
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="mfg-hint" style={{ textAlign: 'center', padding: '6px 0', color: '#6a7488' }}>
+            Strike the tube near your microphone to detect pitch & calculate exact cut.
+          </div>
+        )}
       </div>
     </div>
   )

@@ -540,4 +540,350 @@ body { font-family: system-ui, sans-serif; color: #dfe3ea; }
   color: #fff;
 }
 
+/* ───────────────────────── Manufacturing Tuning & Analysis ───────────────────────── */
+
+.mfg-analyzer {
+  margin-top: 14px;
+  padding: 10px;
+  background: rgba(16, 21, 31, 0.75);
+  border: 1px solid #252f42;
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.mfg-analyzer-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.mfg-analyzer-title {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #aeb8cc;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.mfg-analyzer-badge {
+  font-size: 9px;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: rgba(108, 140, 255, 0.15);
+  color: #6c8cff;
+  border: 1px solid rgba(108, 140, 255, 0.3);
+}
+
+.mfg-table tr.mfg-row-active {
+  background: rgba(108, 140, 255, 0.22) !important;
+  outline: 1px solid #6c8cff;
+}
+
+.mfg-table tr {
+  cursor: pointer;
+}
+
+.mfg-select-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+}
+
+.mfg-select-row label {
+  color: #aeb8cc;
+  flex: none;
+  font-weight: 500;
+}
+
+.mfg-tube-select {
+  flex: 1;
+  background: #141b27;
+  color: #dfe3ea;
+  border: 1px solid #2a3449;
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-size: 11px;
+  font-family: inherit;
+  outline: none;
+}
+.mfg-tube-select:focus {
+  border-color: #6c8cff;
+}
+
+.mfg-mic-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.mfg-mic-btn {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: 1px solid #2e3a50;
+  background: #192233;
+  color: #dfe3ea;
+  user-select: none;
+}
+
+.mfg-mic-btn:hover {
+  background: #233048;
+  border-color: #43587d;
+  color: #fff;
+}
+
+.mfg-mic-btn.active {
+  background: #3e1822;
+  border-color: #832b3f;
+  color: #ff94a8;
+  animation: mic-pulse 2s infinite;
+}
+
+@keyframes mic-pulse {
+  0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.5); }
+  70% { box-shadow: 0 0 0 6px rgba(239, 68, 68, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+}
+
+.mfg-vu-meter {
+  width: 100%;
+  height: 4px;
+  background: #131824;
+  border-radius: 2px;
+  overflow: hidden;
+  position: relative;
+}
+
+.mfg-vu-bar {
+  height: 100%;
+  background: linear-gradient(90deg, #6c8cff 0%, #7ddb91 70%, #ff8a65 95%);
+  transition: width 0.06s ease-out;
+}
+
+/* Tuner gauge & frequency display */
+.mfg-tuner-box {
+  background: #10141d;
+  border: 1px solid #1f2736;
+  border-radius: 6px;
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.mfg-tuner-readout {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+
+.mfg-freq-live {
+  font-size: 18px;
+  font-weight: 700;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: #ffffff;
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+}
+
+.mfg-freq-unit {
+  font-size: 11px;
+  color: #7b88a1;
+  font-weight: 400;
+}
+
+.mfg-target-hint {
+  font-size: 11px;
+  color: #8c98af;
+}
+
+.mfg-target-hint strong {
+  color: #dfe3ea;
+}
+
+.mfg-cents-gauge {
+  position: relative;
+  height: 18px;
+  background: #141b27;
+  border-radius: 4px;
+  border: 1px solid #242f44;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+}
+
+.mfg-gauge-center {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: rgba(255, 255, 255, 0.4);
+  transform: translateX(-50%);
+  z-index: 1;
+}
+
+.mfg-gauge-sweet-spot {
+  position: absolute;
+  left: calc(50% - 10%);
+  width: 20%;
+  top: 0;
+  bottom: 0;
+  background: rgba(125, 219, 145, 0.12);
+  border-left: 1px dashed rgba(125, 219, 145, 0.3);
+  border-right: 1px dashed rgba(125, 219, 145, 0.3);
+}
+
+.mfg-gauge-needle {
+  position: absolute;
+  top: 1px;
+  bottom: 1px;
+  width: 4px;
+  border-radius: 2px;
+  transform: translateX(-50%);
+  transition: left 0.08s ease-out, background-color 0.15s ease;
+  z-index: 2;
+}
+
+.mfg-gauge-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 9px;
+  color: #55627a;
+  padding: 0 2px;
+}
+
+/* Strike banner / locked state */
+.mfg-strike-banner {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: rgba(108, 140, 255, 0.1);
+  border: 1px solid rgba(108, 140, 255, 0.25);
+  border-radius: 5px;
+  padding: 5px 8px;
+  font-size: 11px;
+  color: #9cb5ff;
+}
+
+.mfg-strike-banner button {
+  background: none;
+  border: none;
+  color: #6c8cff;
+  font-size: 11px;
+  cursor: pointer;
+  padding: 0 4px;
+  text-decoration: underline;
+}
+.mfg-strike-banner button:hover {
+  color: #fff;
+}
+
+/* Cut Card */
+.mfg-cut-card {
+  border-radius: 6px;
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  border: 1px solid #2a3449;
+  background: #141a26;
+}
+
+.mfg-cut-card.flat {
+  border-color: rgba(125, 219, 145, 0.35);
+  background: rgba(125, 219, 145, 0.06);
+}
+
+.mfg-cut-card.in_tune {
+  border-color: rgba(125, 219, 145, 0.6);
+  background: rgba(125, 219, 145, 0.12);
+}
+
+.mfg-cut-card.sharp {
+  border-color: rgba(255, 138, 101, 0.4);
+  background: rgba(255, 138, 101, 0.08);
+}
+
+.mfg-cut-primary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.mfg-cut-amount {
+  font-size: 14px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.mfg-cut-card.flat .mfg-cut-amount {
+  color: #7ddb91;
+}
+
+.mfg-cut-card.in_tune .mfg-cut-amount {
+  color: #7ddb91;
+}
+
+.mfg-cut-card.sharp .mfg-cut-amount {
+  color: #ff9e80;
+}
+
+.mfg-cut-details {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px 8px;
+  font-size: 10.5px;
+  color: #aeb8cc;
+  padding-top: 4px;
+  border-top: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.mfg-cut-details strong {
+  color: #dfe3ea;
+}
+
+.mfg-length-input-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 11px;
+}
+
+.mfg-length-input-row input {
+  width: 76px;
+  background: #111622;
+  border: 1px solid #2a3449;
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-size: 11px;
+  color: #dfe3ea;
+  text-align: right;
+  font-family: ui-monospace, SFMono-Regular, monospace;
+}
+.mfg-length-input-row input:focus {
+  border-color: #6c8cff;
+  outline: none;
+}
+
+
 
