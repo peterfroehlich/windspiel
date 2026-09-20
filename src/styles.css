@@ -942,5 +942,123 @@ body { font-family: system-ui, sans-serif; color: #dfe3ea; }
   outline: none;
 }
 
+/* Material Calibration Card */
+.mfg-calib-box {
+  margin-top: 6px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: #141a27;
+  border: 1px solid #232f48;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.mfg-calib-box.is-calibrated {
+  border-color: rgba(108, 140, 255, 0.45);
+  background: rgba(108, 140, 255, 0.05);
+}
+
+.mfg-calib-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.mfg-calib-title {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #dfe3ea;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.mfg-calib-badge {
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 10px;
+  background: rgba(108, 140, 255, 0.15);
+  border: 1px solid rgba(108, 140, 255, 0.4);
+  color: #9cb5ff;
+  font-family: ui-monospace, SFMono-Regular, monospace;
+}
+
+.mfg-calib-desc {
+  font-size: 10.5px;
+  line-height: 1.4;
+  color: #a7b7d6;
+}
+
+.mfg-calib-desc strong {
+  color: #fff;
+}
+
+.mfg-calib-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 2px;
+}
+
+.mfg-calib-apply-btn {
+  flex: 1;
+  background: linear-gradient(135deg, #283a62 0%, #1c2642 100%);
+  border: 1px solid #4865aa;
+  color: #dbe4ff;
+  border-radius: 4px;
+  padding: 5px 8px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  transition: all 0.15s ease;
+}
+
+.mfg-calib-apply-btn:hover {
+  background: linear-gradient(135deg, #354d82 0%, #233157 100%);
+  border-color: #6c8cff;
+  color: #fff;
+  box-shadow: 0 0 8px rgba(108, 140, 255, 0.3);
+}
+
+.mfg-calib-apply-btn:active {
+  transform: scale(0.98);
+}
+
+.mfg-calib-reset-btn {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid #2a3449;
+  color: #8fa0bd;
+  border-radius: 4px;
+  padding: 5px 8px;
+  font-size: 10.5px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+}
+
+.mfg-calib-reset-btn:hover {
+  background: rgba(255, 138, 101, 0.15);
+  border-color: #ff8a65;
+  color: #ff9e80;
+}
+
+.mfg-calib-table-pill {
+  display: inline-block;
+  font-size: 9px;
+  color: #7ddb91;
+  background: rgba(125, 219, 145, 0.12);
+  border: 1px solid rgba(125, 219, 145, 0.3);
+  padding: 0 3px;
+  border-radius: 3px;
+  margin-left: 4px;
+  font-family: ui-monospace, SFMono-Regular, monospace;
+}
+
+
 
 

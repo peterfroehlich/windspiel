@@ -30,6 +30,7 @@ export interface ChimeConfig {
   solid: boolean                // solid rod instead of hollow tube
   coupling: boolean             // sympathetic vibration between tubes via the frame (always on)
   sameAbsoluteSuspension: boolean // all tubes share the same absolute suspension distance from top
+  materialSpeedFactors: Record<string, number> // calibrated wave speed factor per material (1.0 = textbook)
   tuningMode: 'scale' | 'manual'
   scaleId: string
   rootNote: string              // overrides scale's default root ('' = use default)
@@ -64,6 +65,7 @@ export const DEFAULT_CONFIG: ChimeConfig = {
   solid: false,
   coupling: true,
   sameAbsoluteSuspension: false,
+  materialSpeedFactors: {},
   tuningMode: 'scale',
   scaleId: 'pentMajor',
   rootNote: 'C',
@@ -136,11 +138,13 @@ export function tubeGeometry(config: ChimeConfig, index: number): { material: st
 
 export function tubeSpec(config: ChimeConfig, tube: TubeConfig, index = 0): TubeSpec {
   const g = tubeGeometry(config, index)
+  const speedFactor = config.materialSpeedFactors?.[g.material] ?? 1.0
   return {
     length: tube.length_mm / 1000,
     outerDiameter: g.Do,
     wallThickness: g.t,
     material: g.material,
+    speedFactor,
   }
 }
 
@@ -187,7 +191,8 @@ function computeTubes(c: ChimeConfig): TubeConfig[] {
       const note = c.manualNotes[i] ?? 'A4'
       const freq = noteToFreq(note)
       const g = tubeGeometry(c, i)
-      const L = lengthForFrequency(freq, g.material, g.Do, g.t) * 1000
+      const speedFactor = c.materialSpeedFactors?.[g.material] ?? 1.0
+      const L = lengthForFrequency(freq, g.material, g.Do, g.t, speedFactor) * 1000
       out.push({ note, freq, length_mm: L })
     }
   } else {
@@ -195,7 +200,8 @@ function computeTubes(c: ChimeConfig): TubeConfig[] {
     const notes = scaleFrequencies(scale, c.tubeCount, c.rootNote || undefined)
     for (let i = 0; i < c.tubeCount; i++) {
       const g = tubeGeometry(c, i)
-      const L = lengthForFrequency(notes[i].freq, g.material, g.Do, g.t) * 1000
+      const speedFactor = c.materialSpeedFactors?.[g.material] ?? 1.0
+      const L = lengthForFrequency(notes[i].freq, g.material, g.Do, g.t, speedFactor) * 1000
       out.push({ note: notes[i].note, freq: notes[i].freq, length_mm: L })
     }
   }

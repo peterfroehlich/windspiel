@@ -14,7 +14,7 @@ import { HELP } from './help'
 import { PhysicsModal } from './PhysicsModal'
 import { DEFAULT_CONFIG } from '../state/store'
 import { listPresets as presetsList, savePreset, loadPreset, deletePreset } from '../state/presets'
-import { estimateCut, freqToNote } from '../physics/tuning'
+import { estimateCut, freqToNote, calculateMaterialCalibration } from '../physics/tuning'
 import { AudioPitchTracker } from '../audio/pitchDetector'
 
 
@@ -763,7 +763,7 @@ function OpticsSection() {
 /* ───────────────────────── Manufacturing ───────────────────────── */
 
 function ManufacturingSection() {
-  const { config, tubes, setWindOn } = useStore()
+  const { config, tubes, setWindOn, setConfig } = useStore()
   const [copied, setCopied] = useState(false)
   const wrapRef = useRef<HTMLDivElement>(null)
   const [canScrollRight, setCanScrollRight] = useState(false)
@@ -911,6 +911,22 @@ function ManufacturingSection() {
     ? parsedManual
     : (capturedFreq ?? liveFreq ?? 0)
 
+  const activeGeom = tubeGeometry(config, activeIdx)
+  const currentSpeedFactor = config.materialSpeedFactors?.[activeGeom.material] ?? 1.0
+  const isMaterialCalibrated = Math.abs(currentSpeedFactor - 1.0) > 0.0005
+  const matLabel = MATERIALS[activeGeom.material]?.label ?? activeGeom.material
+
+  const calib = measuredFreq > 0
+    ? calculateMaterialCalibration(
+        activeGeom.material,
+        activeGeom.Do * 1000,
+        activeGeom.t * 1000,
+        activeGeom.solid,
+        currentLength_mm,
+        measuredFreq
+      )
+    : null
+
   const cutEstimate = estimateCut(measuredFreq, targetFreq, currentLength_mm)
   const noteInfo = freqToNote(measuredFreq)
 
@@ -963,6 +979,8 @@ function ManufacturingSection() {
                 const g = tubeGeometry(config, i)
                 const susp = tubeSuspension(config, tubes, i)
                 const matLabel = MATERIALS[g.material]?.label ?? g.material
+                const matFactor = config.materialSpeedFactors?.[g.material] ?? 1.0
+                const isCalib = Math.abs(matFactor - 1.0) > 0.0005
                 const dia_mm = (g.Do * 1000).toFixed(1)
                 const wall_mm = g.solid ? 'solid' : (g.t * 1000).toFixed(2) + ' mm'
                 const isSelected = activeIdx === i
@@ -982,7 +1000,25 @@ function ManufacturingSection() {
                       <span className="mfg-idx">#{i + 1}</span>{' '}
                       <span className="mfg-note">{t.note}</span>
                     </td>
-                    <td className="mfg-mat" title={matLabel}>{matLabel}</td>
+                    <td
+                      className="mfg-mat"
+                      title={
+                        matLabel +
+                        (isCalib
+                          ? ` (Calibrated: ${(Math.sqrt(matFactor) * 100).toFixed(1)}% length)`
+                          : '')
+                      }
+                    >
+                      {matLabel}
+                      {isCalib && (
+                        <span
+                          className="mfg-calib-table-pill"
+                          title={`Calibrated: ${(Math.sqrt(matFactor) * 100).toFixed(1)}% length`}
+                        >
+                          {(Math.sqrt(matFactor) * 100).toFixed(0)}%
+                        </span>
+                      )}
+                    </td>
                     <td className="mfg-num">{dia_mm} mm</td>
                     <td className="mfg-num">{wall_mm}</td>
                     <td className="mfg-num mfg-len">{t.length_mm.toFixed(1)} mm</td>
@@ -999,6 +1035,11 @@ function ManufacturingSection() {
           {config.sameAbsoluteSuspension
             ? `Holes drilled at uniform ${tubeSuspension(config, tubes, 0).mm.toFixed(1)} mm from top`
             : `Holes drilled @ ${(config.suspensionPoint * 100).toFixed(1)}% of length from top`}
+          {isMaterialCalibrated && (
+            <span style={{ marginLeft: 8, color: '#7ddb91' }}>
+              • {matLabel} calibrated: {(Math.sqrt(currentSpeedFactor) * 100).toFixed(1)}% length
+            </span>
+          )}
         </div>
         <button className="mini-action-btn" onClick={copyCutList} title="Copy cut list to clipboard (tab-separated)">
           {copied ? '✓ Copied' : '📋 Copy cut list'}
@@ -1243,6 +1284,96 @@ function ManufacturingSection() {
             Strike the tube near your microphone to detect pitch & calculate exact cut.
           </div>
         )}
+
+        {/* Material Calibration Card */}
+        <div className={`mfg-calib-box ${isMaterialCalibrated ? 'is-calibrated' : ''}`}>
+          <div className="mfg-calib-header">
+            <span className="mfg-calib-title">🎯 Material Calibration ({matLabel})</span>
+            {isMaterialCalibrated && (
+              <span className="mfg-calib-badge" title="Material wave speed and length factor applied">
+                {(Math.sqrt(currentSpeedFactor) * 100).toFixed(1)}% length
+              </span>
+            )}
+          </div>
+
+          {calib ? (
+            <>
+              <div className="mfg-calib-desc">
+                {calib.deltaPercent < -0.1 ? (
+                  <>
+                    Measured sound velocity is <strong>{calib.calibratedWaveSpeed} m/s</strong> (theoretical: {calib.nominalWaveSpeed} m/s).
+                    Your stock runs flat — cut lengths need to be <strong>{Math.abs(calib.deltaPercent).toFixed(1)}% shorter</strong> ({(calib.lengthFactor * 100).toFixed(1)}% of textbook).
+                  </>
+                ) : calib.deltaPercent > 0.1 ? (
+                  <>
+                    Measured sound velocity is <strong>{calib.calibratedWaveSpeed} m/s</strong> (theoretical: {calib.nominalWaveSpeed} m/s).
+                    Your stock runs sharp — cut lengths need to be <strong>{calib.deltaPercent.toFixed(1)}% longer</strong> ({(calib.lengthFactor * 100).toFixed(1)}% of textbook).
+                  </>
+                ) : (
+                  <>
+                    Measured sound velocity is <strong>{calib.calibratedWaveSpeed} m/s</strong>, matching textbook {matLabel} within ±0.1%.
+                  </>
+                )}
+              </div>
+
+              <div className="mfg-calib-actions">
+                <button
+                  type="button"
+                  className="mfg-calib-apply-btn"
+                  onClick={() => {
+                    if (!customLengthInput) {
+                      setCustomLengthInput(currentLength_mm.toFixed(1))
+                    }
+                    setConfig({
+                      materialSpeedFactors: {
+                        ...config.materialSpeedFactors,
+                        [activeGeom.material]: calib.speedFactor,
+                      },
+                    })
+                  }}
+                  title={`Calibrate all ${matLabel} tube calculations to ${(calib.lengthFactor * 100).toFixed(1)}% length`}
+                >
+                  🎯 Calibrate {matLabel} ({calib.deltaPercent > 0 ? '+' : ''}{calib.deltaPercent.toFixed(1)}% length)
+                </button>
+
+                {isMaterialCalibrated && (
+                  <button
+                    type="button"
+                    className="mfg-calib-reset-btn"
+                    onClick={() => {
+                      const updated = { ...config.materialSpeedFactors }
+                      delete updated[activeGeom.material]
+                      setConfig({ materialSpeedFactors: updated })
+                    }}
+                    title="Reset back to 100% textbook theoretical values"
+                  >
+                    Reset
+                  </button>
+                )}
+              </div>
+            </>
+          ) : (
+            <div className="mfg-calib-desc" style={{ color: '#7b88a1' }}>
+              Strike a tube of known length to measure your alloy's real sound velocity and auto-calibrate all cut lengths.
+              {isMaterialCalibrated && (
+                <div style={{ marginTop: 6 }}>
+                  <button
+                    type="button"
+                    className="mfg-calib-reset-btn"
+                    onClick={() => {
+                      const updated = { ...config.materialSpeedFactors }
+                      delete updated[activeGeom.material]
+                      setConfig({ materialSpeedFactors: updated })
+                    }}
+                    title="Reset back to 100% textbook theoretical values"
+                  >
+                    Reset {matLabel} to 100% (textbook)
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   )

@@ -15,6 +15,9 @@
  *   ΔL = L_current - L_target = L_current * (1 - sqrt(f_measured / f_target))
  */
 
+import { MATERIALS } from './materials'
+import { tubeFrequencies, TubeSpec } from './tubes'
+
 const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B']
 
 export interface NoteInfo {
@@ -98,5 +101,71 @@ export function estimateCut(
     cents: Math.round(cents * 10) / 10 || 0,
     inTune,
     status,
+  }
+}
+
+export interface MaterialCalibration {
+  material: string
+  currentLength_mm: number
+  measuredFreq: number
+  nominalFreq: number
+  speedFactor: number       // c_actual / c_nominal (wave speed ratio)
+  lengthFactor: number      // L_actual / L_nominal = sqrt(speedFactor)
+  deltaPercent: number      // (lengthFactor - 1) * 100
+  calibratedWaveSpeed: number // m/s
+  nominalWaveSpeed: number   // m/s
+}
+
+/**
+ * Compute the material calibration factor from a measured test tube.
+ *
+ * For a tube of length L, theoretical f0 ∝ c / L²
+ * → c_actual / c_nominal = f_measured / f_nominal
+ * → L_actual / L_nominal = sqrt(c_actual / c_nominal)
+ */
+export function calculateMaterialCalibration(
+  material: string,
+  outerDiameter_mm: number,
+  wallThickness_mm: number,
+  solid: boolean,
+  currentLength_mm: number,
+  measuredFreq: number
+): MaterialCalibration | null {
+  if (currentLength_mm <= 0 || measuredFreq <= 0) return null
+
+  const mat = MATERIALS[material] ?? MATERIALS.aluminum
+  const nominalC = Math.sqrt(mat.youngsModulus / mat.density)
+  const Do = outerDiameter_mm / 1000
+  const t = solid ? Infinity : wallThickness_mm / 1000
+
+  // Nominal model frequency without calibration factor
+  const specNominal: TubeSpec = {
+    length: currentLength_mm / 1000,
+    outerDiameter: Do,
+    wallThickness: t,
+    material,
+    speedFactor: 1.0,
+  }
+  const nominalFreq = tubeFrequencies(specNominal).f0
+
+  if (nominalFreq <= 0) return null
+
+  const rawSpeedFactor = measuredFreq / nominalFreq
+  // Clamp to realistic physical range (±30% wave speed)
+  const speedFactor = Math.max(0.6, Math.min(1.4, rawSpeedFactor))
+  const lengthFactor = Math.sqrt(speedFactor)
+  const deltaPercent = (lengthFactor - 1) * 100
+  const calibratedWaveSpeed = Math.round(nominalC * speedFactor)
+
+  return {
+    material,
+    currentLength_mm: Math.round(currentLength_mm * 10) / 10 || 0,
+    measuredFreq: Math.round(measuredFreq * 10) / 10 || 0,
+    nominalFreq: Math.round(nominalFreq * 10) / 10 || 0,
+    speedFactor: Math.round(speedFactor * 10000) / 10000 || 1,
+    lengthFactor: Math.round(lengthFactor * 10000) / 10000 || 1,
+    deltaPercent: Math.round(deltaPercent * 10) / 10 || 0,
+    calibratedWaveSpeed,
+    nominalWaveSpeed: Math.round(nominalC),
   }
 }

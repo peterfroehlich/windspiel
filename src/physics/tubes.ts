@@ -24,6 +24,7 @@ export interface TubeSpec {
   outerDiameter: number // m
   wallThickness: number // m
   material: string
+  speedFactor?: number  // material speed calibration factor (default: 1.0)
 }
 
 export interface TubeAcoustics {
@@ -51,7 +52,7 @@ export function tubeFrequencies(spec: TubeSpec): { f0: number; partials: number[
   const L = spec.length
   const I = inertia(spec.outerDiameter, spec.wallThickness)
   const A = area(spec.outerDiameter, spec.wallThickness)
-  const c = Math.sqrt(m.youngsModulus / m.density)         // bar wave speed
+  const c = Math.sqrt(m.youngsModulus / m.density) * (spec.speedFactor ?? 1.0) // bar wave speed (with calibration)
   const f1 = BEAM_BETA2[0] / (2 * Math.PI) * Math.sqrt(I / A) * c / (L * L)
   const partials = OVERTONE_RATIOS.map(r => f1 * r)
   return { f0: f1, partials }
@@ -88,10 +89,10 @@ export function analyzeTube(spec: TubeSpec, suspensionPoint = 0.224): TubeAcoust
  * Inverse problem: given target f0, solve for tube length L.
  * f1 ∝ sqrt(I/A)/L² * c → L = sqrt( (beta²/2π) * sqrt(I/A) * c / f0 )
  */
-export function lengthForFrequency(f0: number, material: string, Do: number, t: number): number {
+export function lengthForFrequency(f0: number, material: string, Do: number, t: number, speedFactor = 1.0): number {
   const m = MATERIALS[material] ?? MATERIALS.aluminum
   const I = inertia(Do, t), A = area(Do, t)
-  const c = Math.sqrt(m.youngsModulus / m.density)
+  const c = Math.sqrt(m.youngsModulus / m.density) * speedFactor
   return Math.sqrt((BEAM_BETA2[0] / (2 * Math.PI)) * Math.sqrt(I / A) * c / f0)
 }
 

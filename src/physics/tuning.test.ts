@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { freqToNote, estimateCut } from './tuning'
+import { freqToNote, estimateCut, calculateMaterialCalibration } from './tuning'
 
 describe('freqToNote', () => {
   it('identifies standard A4 as 440 Hz with 0 cents', () => {
@@ -61,5 +61,38 @@ describe('estimateCut', () => {
     const est = estimateCut(0, 500, 300)
     expect(est.cutAmount_mm).toBe(0)
     expect(est.inTune).toBe(false)
+  })
+})
+
+describe('calculateMaterialCalibration', () => {
+  it('returns speedFactor 1.0 when measured frequency equals theoretical', () => {
+    // For 25mm OD x 1.2mm wall aluminum at 500mm
+    const calib = calculateMaterialCalibration('aluminum', 25, 1.2, false, 500, 606.6)
+    expect(calib).not.toBeNull()
+    if (calib) {
+      expect(calib.nominalFreq).toBeCloseTo(606.6, 0)
+      expect(calib.speedFactor).toBeCloseTo(1.0, 2)
+      expect(calib.lengthFactor).toBeCloseTo(1.0, 2)
+      expect(calib.deltaPercent).toBeCloseTo(0, 0)
+    }
+  })
+
+  it('detects slower real wave speed and recommends shorter cut lengths', () => {
+    // User stock produces 580 Hz instead of nominal ~609 Hz at 500mm
+    const calib = calculateMaterialCalibration('aluminum', 25, 1.2, false, 500, 580)
+    expect(calib).not.toBeNull()
+    if (calib) {
+      expect(calib.speedFactor).toBeLessThan(1.0)
+      expect(calib.lengthFactor).toBeLessThan(1.0)
+      expect(calib.deltaPercent).toBeLessThan(0) // negative delta means needs to be shorter
+      expect(calib.calibratedWaveSpeed).toBeLessThan(calib.nominalWaveSpeed)
+      // speedFactor ≈ 580 / 609 = 0.952, lengthFactor = sqrt(0.952) ≈ 0.976 (-2.4%)
+      expect(calib.deltaPercent).toBeCloseTo(-2.4, 0)
+    }
+  })
+
+  it('handles invalid or zero inputs safely', () => {
+    expect(calculateMaterialCalibration('aluminum', 25, 1.2, false, 0, 500)).toBeNull()
+    expect(calculateMaterialCalibration('aluminum', 25, 1.2, false, 500, 0)).toBeNull()
   })
 })

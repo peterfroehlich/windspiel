@@ -193,3 +193,40 @@ describe('tubeSuspension & sameAbsoluteSuspension', () => {
   })
 })
 
+describe('store: materialSpeedFactors calibration', () => {
+  it('calibrating material wave speed scales all tube cut lengths by sqrt(speedFactor)', () => {
+    const uncalibratedLengths = st().tubes.map((t) => t.length_mm)
+    const speedFactor = 0.9025 // sqrt(0.9025) = 0.95 (5% shorter)
+
+    st().setConfig({
+      materialSpeedFactors: {
+        aluminum: speedFactor,
+      },
+    })
+
+    const calibratedLengths = st().tubes.map((t) => t.length_mm)
+    for (let i = 0; i < uncalibratedLengths.length; i++) {
+      expect(calibratedLengths[i] / uncalibratedLengths[i]).toBeCloseTo(0.95, 4)
+    }
+
+    // tubeSpec includes the speedFactor
+    const spec = tubeSpec(st().config, st().tubes[0], 0)
+    expect(spec.speedFactor).toBeCloseTo(speedFactor, 4)
+  })
+
+  it('only affects tubes made of the calibrated material', () => {
+    st().setTubeOverride(1, { material: 'brass' })
+    const brassBefore = st().tubes[1].length_mm
+    const aluBefore = st().tubes[0].length_mm
+
+    st().setConfig({
+      materialSpeedFactors: {
+        aluminum: 0.9,
+      },
+    })
+
+    expect(st().tubes[0].length_mm).toBeLessThan(aluBefore)
+    expect(st().tubes[1].length_mm).toBeCloseTo(brassBefore, 4)
+  })
+})
+
