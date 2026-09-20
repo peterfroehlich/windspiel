@@ -32,6 +32,8 @@ export const STRIKER_MATERIALS: Record<string, {
   softWood: { id: 'softWood', label: 'Softwood',  density: 500,  hardness: 0.45, youngsModulus: 9e9,   color: '#a0784a', roughness: 0.85 },
   hardWood: { id: 'hardWood', label: 'Hardwood',  density: 750,  hardness: 0.7,  youngsModulus: 15e9,  color: '#7a5230', roughness: 0.75 },
   acrylic:  { id: 'acrylic',  label: 'Acrylic',   density: 1180, hardness: 0.85, youngsModulus: 3.2e9, color: '#e8f4f8', roughness: 0.1  },
+  petg:     { id: 'petg',     label: 'PETG',      density: 1270, hardness: 0.75, youngsModulus: 2.1e9, color: '#4ba3e3', roughness: 0.35 },
+  asa:      { id: 'asa',      label: 'ASA',       density: 1060, hardness: 0.78, youngsModulus: 2.3e9, color: '#e67e22', roughness: 0.45 },
   rubber:   { id: 'rubber',   label: 'Rubber',    density: 1100, hardness: 0.15, youngsModulus: 0.05e9,color: '#2a2a2e', roughness: 0.9  },
   metal:    { id: 'metal',    label: 'Metal',     density: 7800, hardness: 1.0,  youngsModulus: 200e9, color: '#9aa0a8', roughness: 0.3  },
 }

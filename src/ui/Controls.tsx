@@ -939,7 +939,7 @@ function ManufacturingTab({
   const [customLengthInput, setCustomLengthInput] = useState<string>('')
   const [micError, setMicError] = useState<string | null>(null)
   const [stlExported, setStlExported] = useState(false)
-  const [cordHoleMm, setCordHoleMm] = useState('3.5')
+  const [cordHoleMm, setCordHoleMm] = useState('2.0')
 
   const trackerRef = useRef<AudioPitchTracker | null>(null)
 
@@ -1113,7 +1113,7 @@ function ManufacturingTab({
     }) * 1000
 
   const handleDownloadSTL = () => {
-    const holeDia = parseFloat(cordHoleMm) > 0 ? parseFloat(cordHoleMm) : 3.5
+    const holeDia = parseFloat(cordHoleMm) > 0 ? parseFloat(cordHoleMm) : 2.0
     downloadStrikerSTL({
       form: config.strikerForm,
       diameter_mm: mfgStrikerDims.diameter_mm,

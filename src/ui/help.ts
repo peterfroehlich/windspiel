@@ -54,8 +54,8 @@ export const HELP: Record<string, string> = {
   strikerMaterial:
     'Striker material. Sets both transient and sustain character: rubber (hardness 0.15) ' +
     'produces a soft, dull "tup" with long Hertzian contact (~2 ms) that filters out the ' +
-    'high partials; hardwood a warm knock; metal a bright click with the highest impulse ' +
-    'transfer (restitution 0.55 vs rubber 0.17) — same swing, noticeably louder chime.',
+    'high partials; hardwood a warm knock; PETG and ASA durable outdoor 3D prints (PETG balanced; ' +
+    'ASA warm with maximum UV/heat stability); metal a bright click with the highest impulse transfer.',
 
   strikerForm:
     'Contact geometry at the impact point — it shapes the tone through the Hertzian ' +

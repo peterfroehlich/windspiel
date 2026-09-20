@@ -6,14 +6,14 @@ export interface StrikerSTLOptions {
   diameter_mm: number
   height_mm: number
   material?: string
-  holeDiameter_mm?: number // default 3.5mm for chime suspension cord
+  holeDiameter_mm?: number // default 2.0mm for chime suspension cord
 }
 
 /**
  * Construct a watertight 3D solid geometry for the striker with a central cord hole.
  */
 export function buildStrikerGeometry(options: StrikerSTLOptions): THREE.BufferGeometry {
-  const { form, diameter_mm, height_mm, holeDiameter_mm = 3.5 } = options
+  const { form, diameter_mm, height_mm, holeDiameter_mm = 2.0 } = options
   const outerR = Math.max(5, diameter_mm / 2)
   const h = Math.max(4, height_mm)
   const holeR = Math.max(1, Math.min(outerR * 0.4, holeDiameter_mm / 2))

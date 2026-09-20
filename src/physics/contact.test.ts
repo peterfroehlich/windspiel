@@ -61,6 +61,24 @@ describe('contact: striker sizing & mass', () => {
     })
     expect(calculatedMass_sphere).toBeCloseTo(targetMass_kg, 2)
   })
+
+  it('solves thickness correctly for PETG and ASA, accounting for density differences', () => {
+    const targetMass_kg = 0.05 // 50g
+    const dia_mm = 55
+
+    const h_petg = solveStrikerHeight_mm(targetMass_kg, 'petg', 'disc', dia_mm)
+    const h_asa = solveStrikerHeight_mm(targetMass_kg, 'asa', 'disc', dia_mm)
+
+    // Because ASA is less dense (1060 kg/m3) than PETG (1270 kg/m3), ASA must be thicker
+    expect(h_asa).toBeGreaterThan(h_petg)
+    expect(h_asa / h_petg).toBeCloseTo(1270 / 1060, 1)
+
+    // Both calculate back to within a fraction of a gram of the target mass
+    const mass_petg = strikerMass({ material: 'petg', form: 'disc', diameter_mm: dia_mm, height_mm: h_petg })
+    const mass_asa = strikerMass({ material: 'asa', form: 'disc', diameter_mm: dia_mm, height_mm: h_asa })
+    expect(mass_petg).toBeCloseTo(targetMass_kg, 2)
+    expect(mass_asa).toBeCloseTo(targetMass_kg, 2)
+  })
 })
 
 describe('stlExport: striker 3D mesh generation', () => {
@@ -71,7 +89,7 @@ describe('stlExport: striker 3D mesh generation', () => {
         form,
         diameter_mm: 55,
         height_mm: 20,
-        holeDiameter_mm: 3.5,
+        // tests default holeDiameter_mm = 2.0
       })
       // Binary STL has 80-byte header + 4-byte triangle count -> minimum 84 bytes
       expect(bytes.byteLength).toBeGreaterThan(1000)

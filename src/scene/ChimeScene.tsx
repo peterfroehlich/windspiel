@@ -97,7 +97,7 @@ function TubeMesh({ index, dropY }: { index: number; dropY: number }) {
 
 function Striker({ dropY }: { dropY: number }) {
   const { config, tubes } = useStore()
-  const mat = STRIKER_MATERIALS[config.strikerMaterial]
+  const mat = STRIKER_MATERIALS[config.strikerMaterial] ?? STRIKER_MATERIALS.hardWood
   const ref = useRef<THREE.Group>(null)
   const wind = windSim.state
   const strikerDims = effectiveStrikerDimensions(config, tubes)
