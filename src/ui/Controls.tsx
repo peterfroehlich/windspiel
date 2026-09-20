@@ -1,7 +1,7 @@
 import { useState, useRef, useLayoutEffect, useEffect } from 'react'
 import type { ChangeEvent } from 'react'
 import { createPortal } from 'react-dom'
-import { useStore, tubeSpec, maxDrop_mm, optimalDrop_mm, equalLoudnessDrop_mm, tubeGeometry } from '../state/store'
+import { useStore, tubeSpec, maxDrop_mm, optimalDrop_mm, equalLoudnessDrop_mm, tubeGeometry, tubeSuspension } from '../state/store'
 import { MATERIALS, STRIKER_MATERIALS, STRIKER_FORMS } from '../physics/materials'
 import { SCALES, MOODS, NOTE_NAMES } from '../physics/scales'
 import { tubeDecay } from '../physics/tubes'
@@ -244,9 +244,10 @@ function AcousticsInfo({ tubeIndex }: { tubeIndex?: number | null }) {
   const best = estimateStrike(spec, striker, 0.3, opt.xi)
   const mass = strikerMass(striker)
   // suspension effect on sustain: free T60 vs hung-at-current-point T60
-  const suspFactor = suspensionLossFactor(config.suspensionPoint, 0)
+  const susp = tubeSuspension(config, tubes, idx)
+  const suspFactor = suspensionLossFactor(susp.fraction, 0)
   const hungT60 = est.decayT60 * suspFactor
-  const atNode = config.suspensionPoint >= 0.19 && config.suspensionPoint <= 0.26
+  const atNode = susp.fraction >= 0.19 && susp.fraction <= 0.26
   const label = tubeIndex != null
     ? `Tube ${idx + 1} — ${tube.note} (${tube.length_mm.toFixed(0)} mm)`
     : 'Strike analysis (longest tube)'
@@ -267,7 +268,7 @@ function AcousticsInfo({ tubeIndex }: { tubeIndex?: number | null }) {
       </div>
       <div className="ac-row"><span>SPL estimate @1 m</span><span>{est.splAt1m.toFixed(0)} dB</span></div>
       <div className="ac-row">
-        <span>Decay T60 (hung @ {(config.suspensionPoint * 100).toFixed(1)}%)</span>
+        <span>Decay T60 (hung @ {(susp.fraction * 100).toFixed(1)}%)</span>
         <span className={atNode ? 'good' : ''}>{hungT60.toFixed(1)} s</span>
       </div>
       <div className="ac-hint">
@@ -451,10 +452,10 @@ function TubesSection() {
         value={config.suspensionPoint} onChange={(v) => setConfig({ suspensionPoint: v })}
         marker={0.224} markerLabel="◎ mode-1 node — maximum sustain" />
       <label className="row check">
-        <input type="checkbox" checked={config.coupling}
-          onChange={(e) => setConfig({ coupling: e.target.checked })} />
-        <span className="label" style={{ width: 'auto' }}>Tube coupling</span>
-        <Help id="coupling" />
+        <input type="checkbox" checked={config.sameAbsoluteSuspension}
+          onChange={(e) => setConfig({ sameAbsoluteSuspension: e.target.checked })} />
+        <span className="label" style={{ width: 'auto' }}>Same absolute suspension point</span>
+        <Help id="sameAbsoluteSuspension" />
       </label>
       <label className="row check adv-toggle">
         <input type="checkbox" checked={config.advanced}
@@ -467,7 +468,8 @@ function TubesSection() {
           {tubes.map((t, i) => {
             const o = config.tubeOverrides[i] ?? {}
             const g = tubeGeometry(config, i)
-            const overridden = o.material || o.outerDiameter_mm || o.wallThickness_mm || o.solid !== undefined
+            const susp = tubeSuspension(config, tubes, i)
+            const overridden = o.material || o.outerDiameter_mm || o.wallThickness_mm || o.solid !== undefined || o.suspensionPoint !== undefined
             return (
               <div key={i} className={'adv-tube' + (overridden ? ' ovr' : '')}>
                 <div className="adv-head">
@@ -476,7 +478,13 @@ function TubesSection() {
                   <span className="adv-len">{t.length_mm.toFixed(0)} mm</span>
                   {overridden && (
                     <button className="adv-reset" title="Reset this tube to global settings"
-                      onClick={() => setTubeOverride(i, { material: config.material, outerDiameter_mm: config.outerDiameter_mm, wallThickness_mm: config.wallThickness_mm, solid: config.solid })}>
+                      onClick={() => setTubeOverride(i, {
+                        material: config.material,
+                        outerDiameter_mm: config.outerDiameter_mm,
+                        wallThickness_mm: config.wallThickness_mm,
+                        solid: config.solid,
+                        suspensionPoint: config.suspensionPoint,
+                      })}>
                       ⟲
                     </button>
                   )}
@@ -510,6 +518,13 @@ function TubesSection() {
                   <input type="checkbox" checked={g.solid}
                     onChange={(e) => setTubeOverride(i, { solid: e.target.checked })} />
                   <span className="adv-val" style={{ width: 'auto' }}>rod</span>
+                </div>
+                <div className="adv-row">
+                  <span className="adv-label">Susp</span>
+                  <input type="range" min={0.1} max={0.5} step={0.005}
+                    value={o.suspensionPoint ?? config.suspensionPoint}
+                    onChange={(e) => setTubeOverride(i, { suspensionPoint: parseFloat(e.target.value) })} />
+                  <span className="adv-val">{((susp.fraction) * 100).toFixed(1)}%</span>
                 </div>
               </div>
             )
@@ -674,9 +689,7 @@ function previewTube(i: number) {
   audio.init(); audio.resume()
   const a = (i / config.tubeCount) * Math.PI * 2
   const xi = Math.max(0.02, Math.min(0.98, (config.strikerDrop_mm / 1000) / (tubes[i].length_mm / 1000)))
-  const neighbours = config.coupling
-    ? tubes.filter((_, j) => j !== i).map((t, j2) => tubeSpec(config, t, j2 < i ? j2 : j2 + 1))
-    : []
+  const neighbours = tubes.filter((_, j) => j !== i).map((_, j2) => specOf(j2 < i ? j2 : j2 + 1))
   const spec = specOf(i)
   const f0 = tubeFrequencies(spec).f0
   const striker = {
@@ -685,7 +698,8 @@ function previewTube(i: number) {
   }
   const partials = [1, 2.756, 5.404, 8.933].map((r) =>
     partialExcitation(r * f0, striker, spec, 0.1275, xi))
-  audio.strike(spec, 0.85, Math.cos(a) * 0.7, xi, config.suspensionPoint, neighbours, { partials })
+  const susp = tubeSuspension(config, tubes, i)
+  audio.strike(spec, 0.85, Math.cos(a) * 0.7, xi, susp.fraction, neighbours, { partials })
   useStore.getState().flash(i, 0.8)
 }
 
@@ -777,11 +791,11 @@ function ManufacturingSection() {
     const headers = ['Tube', 'Note', 'Material', 'Outer Ø (mm)', 'Wall (mm)', 'Length (mm)', 'Suspension Pos (mm from top)']
     const rows = tubes.map((t, i) => {
       const g = tubeGeometry(config, i)
-      const susp_mm = t.length_mm * config.suspensionPoint
+      const susp = tubeSuspension(config, tubes, i)
       const mat = MATERIALS[g.material]?.label ?? g.material
       const dia = (g.Do * 1000).toFixed(1)
       const wall = g.solid ? 'solid' : (g.t * 1000).toFixed(2)
-      return [i + 1, t.note, mat, dia, wall, t.length_mm.toFixed(1), susp_mm.toFixed(1)].join('\t')
+      return [i + 1, t.note, mat, dia, wall, t.length_mm.toFixed(1), susp.mm.toFixed(1)].join('\t')
     })
     navigator.clipboard?.writeText([headers.join('\t'), ...rows].join('\n'))
     setCopied(true)
@@ -816,7 +830,7 @@ function ManufacturingSection() {
             <tbody>
               {tubes.map((t, i) => {
                 const g = tubeGeometry(config, i)
-                const susp_mm = t.length_mm * config.suspensionPoint
+                const susp = tubeSuspension(config, tubes, i)
                 const matLabel = MATERIALS[g.material]?.label ?? g.material
                 const dia_mm = (g.Do * 1000).toFixed(1)
                 const wall_mm = g.solid ? 'solid' : (g.t * 1000).toFixed(2) + ' mm'
@@ -830,7 +844,7 @@ function ManufacturingSection() {
                     <td className="mfg-num">{dia_mm} mm</td>
                     <td className="mfg-num">{wall_mm}</td>
                     <td className="mfg-num mfg-len">{t.length_mm.toFixed(1)} mm</td>
-                    <td className="mfg-num mfg-susp">{susp_mm.toFixed(1)} mm</td>
+                    <td className="mfg-num mfg-susp">{susp.mm.toFixed(1)} mm</td>
                   </tr>
                 )
               })}
@@ -840,7 +854,9 @@ function ManufacturingSection() {
       </div>
       <div className="mfg-footer">
         <div className="mfg-hint">
-          Holes drilled @ {(config.suspensionPoint * 100).toFixed(1)}% of length from top
+          {config.sameAbsoluteSuspension
+            ? `Holes drilled at uniform ${tubeSuspension(config, tubes, 0).mm.toFixed(1)} mm from top`
+            : `Holes drilled @ ${(config.suspensionPoint * 100).toFixed(1)}% of length from top`}
         </div>
         <button className="mini-action-btn" onClick={copyCutList} title="Copy cut list to clipboard (tab-separated)">
           {copied ? '✓ Copied' : '📋 Copy cut list'}

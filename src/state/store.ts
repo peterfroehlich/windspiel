@@ -16,6 +16,7 @@ export interface TubeOverride {
   outerDiameter_mm?: number
   wallThickness_mm?: number
   solid?: boolean
+  suspensionPoint?: number       // 0..0.5 fraction of length
 }
 
 export interface ChimeConfig {
@@ -26,7 +27,8 @@ export interface ChimeConfig {
   advanced: boolean             // per-tube material/diameter/wall editing
   tubeOverrides: TubeOverride[] // index-aligned with tubes; empty = defaults
   solid: boolean                // solid rod instead of hollow tube
-  coupling: boolean             // sympathetic vibration between tubes via the frame
+  coupling: boolean             // sympathetic vibration between tubes via the frame (always on)
+  sameAbsoluteSuspension: boolean // all tubes share the same absolute suspension distance from top
   tuningMode: 'scale' | 'manual'
   scaleId: string
   rootNote: string              // overrides scale's default root ('' = use default)
@@ -60,6 +62,7 @@ export const DEFAULT_CONFIG: ChimeConfig = {
   tubeOverrides: [],
   solid: false,
   coupling: true,
+  sameAbsoluteSuspension: false,
   tuningMode: 'scale',
   scaleId: 'pentMajor',
   rootNote: 'C',
@@ -138,6 +141,35 @@ export function tubeSpec(config: ChimeConfig, tube: TubeConfig, index = 0): Tube
     wallThickness: g.t,
     material: g.material,
   }
+}
+
+/** Resolve a tube's effective suspension point (fraction and absolute mm from top). */
+export function tubeSuspension(
+  config: ChimeConfig,
+  tubes: TubeConfig[],
+  index: number
+): { fraction: number; mm: number } {
+  const o = config.tubeOverrides[index] ?? {}
+  const tube = tubes[index]
+  const L_mm = tube ? tube.length_mm : 300
+
+  // 1. Per-tube override wins
+  if (o.suspensionPoint !== undefined) {
+    const fraction = o.suspensionPoint
+    return { fraction, mm: fraction * L_mm }
+  }
+
+  // 2. Same absolute suspension point for all tubes (anchored by reference longest tube)
+  if (config.sameAbsoluteSuspension) {
+    const longest = tubes.length ? Math.max(...tubes.map((t) => t.length_mm)) : L_mm
+    const mm = config.suspensionPoint * longest
+    const fraction = L_mm > 0 ? mm / L_mm : config.suspensionPoint
+    return { fraction, mm }
+  }
+
+  // 3. Global relative fraction
+  const fraction = config.suspensionPoint
+  return { fraction, mm: fraction * L_mm }
 }
 
 function computeTubes(c: ChimeConfig): TubeConfig[] {
@@ -236,6 +268,7 @@ export const useStore = create<State>((set) => ({
     if (g.outerDiameter_mm === s.config.outerDiameter_mm) delete g.outerDiameter_mm
     if (g.wallThickness_mm === s.config.wallThickness_mm) delete g.wallThickness_mm
     if (g.solid === s.config.solid) delete g.solid
+    if (g.suspensionPoint === s.config.suspensionPoint) delete g.suspensionPoint
     const tubes = computeTubes(c)
     return { config: c, tubes }
   }),

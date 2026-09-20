@@ -46,6 +46,11 @@ export const HELP: Record<string, string> = {
     'center (50%) the fundamental decays ~2× faster while the 2nd partial (node at center) ' +
     'actually survives longer. Watch the T60 row in the strike analysis update live.',
 
+  sameAbsoluteSuspension:
+    'Hang all tubes at the exact same absolute distance in mm from their top ends (derived from ' +
+    'the longest tube\'s nodal distance). Tube tops hang in a uniform horizontal line, while ' +
+    'the effective nodal fraction adjusts per tube.',
+
   strikerMaterial:
     'Striker material. Sets both transient and sustain character: rubber (hardness 0.15) ' +
     'produces a soft, dull "tup" with long Hertzian contact (~2 ms) that filters out the ' +

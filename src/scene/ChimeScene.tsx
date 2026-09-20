@@ -2,7 +2,7 @@ import { useRef, useMemo, useEffect } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { OrbitControls, Environment, ContactShadows } from '@react-three/drei'
 import * as THREE from 'three'
-import { useStore, tubeSpec, tubeGeometry } from '../state/store'
+import { useStore, tubeSpec, tubeGeometry, tubeSuspension } from '../state/store'
 import { MATERIALS, STRIKER_MATERIALS } from '../physics/materials'
 import { WindSim } from '../physics/wind'
 import { audio } from '../audio/engine'
@@ -25,13 +25,23 @@ function TubeMesh({ index, dropY }: { index: number; dropY: number }) {
   const L = tube.length_mm / 1000
   const spec = tubeSpec(config, tube, index)
   const radius = geo.Do / 2
-  const s = config.suspensionPoint * L            // pivot distance below tube top
+  const susp = tubeSuspension(config, tubes, index)
+  const s = susp.mm / 1000            // pivot distance below tube top (m)
   // compound pendulum about the pivot: ω = √(g·d / (L²/12 + d²)),
   // d = distance pivot → center of mass (a real physical wobble rate ~1 Hz)
   const d = L / 2 - s
   const omega = Math.sqrt((9.81 * Math.max(d, 0.01)) / (L * L / 12 + d * d))
   // per-tube strike state: start time & velocity of last wobble excitation
   const strikeState = useRef({ t: -1e9, vel: 0, phase: Math.random() * Math.PI * 2 })
+
+  // Suspension point band:
+  // Anthracite band on lighter/metallic tubes; cream white band on dark tubes (carbon, cast iron).
+  const isDark = useMemo(() => {
+    const c = new THREE.Color(mat.color)
+    const lum = 0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b
+    return lum < 0.42 || geo.material === 'carbon' || geo.material === 'castIron'
+  }, [mat.color, geo.material])
+  const bandColor = isDark ? '#ede6d8' : '#23272e'
 
   useFrame(() => {
     const g = pivotRef.current
@@ -59,7 +69,9 @@ function TubeMesh({ index, dropY }: { index: number; dropY: number }) {
           if (e.button !== 0) return // only left-click strikes; right-click is reserved for panning
           e.stopPropagation()
           audio.init(); audio.resume()
-          audio.strike(spec, 0.8, x * 4)
+          const xi = Math.max(0.02, Math.min(0.98, (config.strikerDrop_mm / 1000) / (tube.length_mm / 1000)))
+          const neighbours = tubes.filter((_, j) => j !== index).map((t, j2) => tubeSpec(config, t, j2 < index ? j2 : j2 + 1))
+          audio.strike(spec, 0.8, x * 4, xi, susp.fraction, neighbours)
           useStore.getState().flash(index, 0.8)
         }}>
         <cylinderGeometry args={[radius, radius, L, 24, 1, true]} />
@@ -73,6 +85,11 @@ function TubeMesh({ index, dropY }: { index: number; dropY: number }) {
       ) : (
         <meshStandardMaterial color={mat.color} metalness={mat.metalness} roughness={mat.roughness} side={THREE.DoubleSide} />
       )}
+      </mesh>
+      {/* Suspension point marker band */}
+      <mesh position={[0, 0, 0]}>
+        <cylinderGeometry args={[radius * 1.015 + 0.0002, radius * 1.015 + 0.0002, 0.004, 32, 1, true]} />
+        <meshStandardMaterial color={bandColor} roughness={0.6} metalness={0.15} side={THREE.DoubleSide} />
       </mesh>
     </group>
   )
@@ -239,19 +256,21 @@ function Sail({ dropY }: { dropY: number }) {
   )
 }
 
-function Strings({ tubeCount, ringR, lengths, dropY }: {
-  tubeCount: number; ringR: number; lengths: number[]; dropY: number
-}) {
+function Strings({ dropY }: { dropY: number }) {
+  const { config, tubes } = useStore()
+  const tubeCount = config.tubeCount
+  const ringR = config.suspensionRadius_mm / 1000
   const lines = useMemo(() => {
     const pts: [number, number, number, number][] = []
     for (let i = 0; i < tubeCount; i++) {
       const a = (i / tubeCount) * Math.PI * 2
       const x = Math.cos(a) * ringR, z = Math.sin(a) * ringR
-      const hang = (lengths[i] ?? 0.3) * 0.224  // suspension point at 22.4%
+      const susp = tubeSuspension(config, tubes, i)
+      const hang = susp.mm / 1000
       pts.push([x, 0, z, -hang])
     }
     return pts
-  }, [tubeCount, ringR, lengths.join(',')])
+  }, [tubeCount, ringR, config, tubes])
 
   return (
     <group position={[0, -dropY, 0]}>
@@ -311,9 +330,10 @@ function Simulator() {
       // strike position along tube: striker hangs strikerDrop below tube tops
       const xi = Math.max(0.02, Math.min(0.98, (config.strikerDrop_mm / 1000) / (tubes[tube].length_mm / 1000)))
       audio.init()          // safety: strikes can fire before first gesture
-      const neighbours = config.coupling
-        ? tubes.filter((_, j) => j !== tube).map((t, j2) => tubeSpec(config, t, j2 < tube ? j2 : j2 + 1))
-        : []
+      // Sympathetic tube coupling is always active
+      const neighbours = tubes
+        .filter((_, j) => j !== tube)
+        .map((t, j2) => tubeSpec(config, t, j2 < tube ? j2 : j2 + 1))
       // Hertzian contact: partial excitation through the contact-time low-pass
       const striker = {
         material: config.strikerMaterial, form: config.strikerForm,
@@ -323,7 +343,8 @@ function Simulator() {
       const f0 = tubeFrequencies(spec).f0
       const partials = [1, 2.756, 5.404, 8.933].map((r) =>
         partialExcitation(r * f0, striker, spec, vImp, xi))
-      audio.strike(spec, vel, pan, xi, config.suspensionPoint, neighbours, { partials })
+      const susp = tubeSuspension(config, tubes, tube)
+      audio.strike(spec, vel, pan, xi, susp.fraction, neighbours, { partials })
       useStore.getState().flash(tube, vel)
     }
   }, [])
@@ -364,7 +385,7 @@ function TopPlate() {
 }
 
 export function ChimeScene() {
-  const { config, tubes } = useStore()
+  const { config } = useStore()
   const dropY = config.tubeDrop_mm / 1000   // plate → tube-start gap
   return (
     <>
@@ -379,10 +400,14 @@ export function ChimeScene() {
         {Array.from({ length: config.tubeCount }, (_, i) => <TubeMesh key={i} index={i} dropY={dropY} />)}
         <Striker dropY={dropY} />
         <Sail dropY={dropY} />
-        <Strings tubeCount={config.tubeCount} ringR={config.suspensionRadius_mm / 1000}
-          lengths={tubes.map((t) => t.length_mm / 1000)} dropY={dropY} />
+        <Strings dropY={dropY} />
         <Simulator />
       </group>
+      <ContactShadows position={[0, -0.4, 0]} opacity={0.4} scale={4} blur={2.5} far={2} />
+      <OrbitControls target={[0, 1.2, 0]} enablePan={true} screenSpacePanning={true} minDistance={0.8} maxDistance={6} />
+    </>
+  )
+}
       <ContactShadows position={[0, -0.4, 0]} opacity={0.4} scale={4} blur={2.5} far={2} />
       <OrbitControls target={[0, 1.2, 0]} enablePan={true} screenSpacePanning={true} minDistance={0.8} maxDistance={6} />
     </>
