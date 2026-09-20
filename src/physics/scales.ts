@@ -26,6 +26,7 @@ export const SCALES: ScalePreset[] = [
   // Meditative — traditional Japanese & suspended colors
   { id: 'akebono',     label: 'Akebono (Japan)',    semitones: [0, 2, 3, 7, 8],                  root: 'D', octave: 5, mood: 'meditative' },
   { id: 'insen',       label: 'In Sen (Japan)',     semitones: [0, 1, 5, 7, 10],                 root: 'E', octave: 5, mood: 'meditative' },
+  { id: 'oli',         label: 'Oli (Hawaiian chant)', semitones: [0, 2, 2, 5, 7],                root: 'F', octave: 4, mood: 'meditative' },
   { id: 'wholeTone',   label: 'Whole tone',         semitones: [0, 2, 4, 6, 8, 10],              root: 'D', octave: 5, mood: 'meditative' },
   { id: 'chinese',     label: 'Chinese',            semitones: [0, 3, 5, 8, 10],                 root: 'A', octave: 4, mood: 'meditative' },
   { id: 'balinese',    label: 'Balinese (gamelan)', semitones: [0, 1, 3, 7, 8],                  root: 'G', octave: 4, mood: 'meditative' },

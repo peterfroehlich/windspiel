@@ -36,6 +36,13 @@ describe('scaleFrequencies', () => {
     expect(notes).toEqual(['A4', 'D5', 'E5', 'F#5'])
   })
 
+  it('oli preset has recitation drone on G4 with F root', () => {
+    const s = SCALES.find((x) => x.id === 'oli')!
+    expect(s).toBeDefined()
+    const notes = scaleFrequencies(s, 6).map((n) => n.note)
+    expect(notes).toEqual(['F4', 'G4', 'G4', 'A#4', 'C5', 'F5'])
+  })
+
   it('every scale has valid semitones, known root and mood', () => {
     const moods = new Set(['bright', 'meditative', 'dark'])
     for (const s of SCALES) {

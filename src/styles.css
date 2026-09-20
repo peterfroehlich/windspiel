@@ -231,7 +231,7 @@ body { font-family: system-ui, sans-serif; color: #dfe3ea; }
   border-radius: 6px; font-size: 12px;
 }
 .tube-row:hover { background: #1a2130; }
-.tube-row .note { width: 34px; font-weight: 600; }
+.tube-row .note { width: 44px; font-weight: 600; }
 .tube-row .freq { color: #6c8cff; width: 70px; font-variant-numeric: tabular-nums; }
 .tube-row .len { color: #8892a6; margin-left: auto; font-variant-numeric: tabular-nums; }
 .tube-row .mini {
@@ -239,8 +239,12 @@ body { font-family: system-ui, sans-serif; color: #dfe3ea; }
   border-radius: 4px; cursor: pointer; padding: 1px 6px;
 }
 .note-input {
-  width: 52px; background: #1a2130; color: #dfe3ea;
-  border: 1px solid #2a3242; border-radius: 4px; padding: 2px 4px; font-size: 11px;
+  width: 44px; background: #141a26; color: #dfe3ea;
+  border: 1px solid #2a3242; border-radius: 4px; padding: 2px 4px; font-size: 12px;
+  font-weight: 600; font-family: inherit;
+}
+.note-input:focus {
+  outline: none; border-color: #6c8cff; background: #1a2130;
 }
 .footer { margin-top: 10px; }
 
@@ -302,3 +306,178 @@ body { font-family: system-ui, sans-serif; color: #dfe3ea; }
 .ac-row .good { color: #7ddb91; }
 .ac-row .bad { color: #e07a7a; }
 .ac-hint { margin-top: 6px; color: #6a7488; line-height: 1.4; }
+
+/* GitHub ribbon banner in upper-left corner */
+.github-corner-banner {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 110px;
+  height: 110px;
+  overflow: hidden;
+  z-index: 100;
+  pointer-events: none;
+}
+
+.github-ribbon {
+  pointer-events: auto;
+  position: absolute;
+  top: 20px;
+  left: -38px;
+  width: 140px;
+  transform: rotate(-45deg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 5px 0;
+  background: rgba(20, 26, 38, 0.88);
+  backdrop-filter: blur(8px);
+  border-top: 1px solid #3a4a6a;
+  border-bottom: 1px solid #1c2434;
+  color: #dfe3ea;
+  text-decoration: none;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.45);
+  transition: all 0.2s ease;
+  user-select: none;
+}
+
+.github-ribbon:hover {
+  background: rgba(35, 46, 68, 0.95);
+  color: #ffffff;
+  border-top-color: #6c8cff;
+  box-shadow: 0 4px 16px rgba(108, 140, 255, 0.3);
+}
+
+.github-ribbon .github-icon {
+  flex-shrink: 0;
+  transition: transform 0.2s ease;
+}
+
+.github-ribbon:hover .github-icon {
+  transform: scale(1.15);
+}
+
+/* ───────────────────────── Manufacturing Section ───────────────────────── */
+.mfg-section {
+  margin-top: 4px;
+}
+
+.mfg-table-wrap {
+  overflow-x: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #2a3242 transparent;
+  border-radius: 6px;
+  background: rgba(16, 22, 32, 0.6);
+  border: 1px solid #1c2434;
+}
+
+.mfg-table-wrap::-webkit-scrollbar {
+  height: 4px;
+}
+.mfg-table-wrap::-webkit-scrollbar-thumb {
+  background: #2a3242;
+  border-radius: 2px;
+}
+
+.mfg-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.3;
+}
+
+.mfg-table th {
+  text-align: left;
+  color: #8892a6;
+  font-weight: 600;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 5px 6px;
+  border-bottom: 1px solid #2a3242;
+  white-space: nowrap;
+}
+
+.mfg-table td {
+  padding: 5px 6px;
+  border-bottom: 1px solid #1c2434;
+  color: #dfe3ea;
+  white-space: nowrap;
+}
+
+.mfg-table tr:last-child td {
+  border-bottom: none;
+}
+
+.mfg-table tr:hover {
+  background: rgba(30, 40, 58, 0.4);
+}
+
+.mfg-idx {
+  color: #6a7488;
+  font-size: 10px;
+}
+
+.mfg-note {
+  font-weight: 600;
+  color: #dfe3ea;
+}
+
+.mfg-mat {
+  color: #aeb8cc;
+  max-width: 75px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mfg-num {
+  color: #aeb8cc;
+}
+
+.mfg-len {
+  color: #7ddb91;
+  font-weight: 600;
+}
+
+.mfg-susp {
+  color: #6c8cff;
+}
+
+.mfg-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 8px;
+  gap: 8px;
+}
+
+.mfg-hint {
+  font-size: 10px;
+  color: #6a7488;
+  line-height: 1.3;
+}
+
+.mini-action-btn {
+  flex-shrink: 0;
+  font-size: 11px;
+  padding: 3px 8px;
+  background: #1a2130;
+  border: 1px solid #2a3242;
+  color: #dfe3ea;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+
+.mini-action-btn:hover {
+  background: #2c3a56;
+  border-color: #4a608a;
+  color: #fff;
+}
+

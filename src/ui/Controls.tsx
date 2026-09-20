@@ -200,7 +200,7 @@ function specOf(i: number) {
   return tubeSpec(config, tubes[i], i)
 }
 
-type SectionId = 'tubes' | 'tuning' | 'striker' | 'wind' | 'optics'
+type SectionId = 'tubes' | 'tuning' | 'striker' | 'wind' | 'optics' | 'manufacturing'
 
 /** Collapsible sidebar section. Multiple sections can be open at once and the
  *  sidebar scrolls. Folded sections unmount (cheap) — all values are derived
@@ -325,7 +325,7 @@ export function Controls() {
 
   // default: Tubes + Tuning open; everything else folded; multi-open, scrollable
   const [open, setOpen] = useState<Record<SectionId, boolean>>({
-    tubes: true, striker: false, wind: false, tuning: true, optics: false,
+    tubes: true, striker: false, wind: false, tuning: true, optics: false, manufacturing: false,
   })
   const toggle = (id: SectionId) => setOpen((o) => ({ ...o, [id]: !o[id] }))
 
@@ -409,6 +409,9 @@ export function Controls() {
         </Section>
         <Section id="optics" title="Optics" open={open} toggle={toggle}>
           <OpticsSection />
+        </Section>
+        <Section id="manufacturing" title="Manufacturing" open={open} toggle={toggle}>
+          <ManufacturingSection />
         </Section>
       </div>
     </div>
@@ -529,7 +532,16 @@ function TuningSection() {
     <>
       <Select label="Mode" value={config.tuningMode} helpId="tuningMode"
         options={[{ id: 'scale', label: 'Scale preset' }, { id: 'manual', label: 'Manual notes' }]}
-        onChange={(v) => setConfig({ tuningMode: v as 'scale' | 'manual' })} />
+        onChange={(v) => {
+          if (v === 'manual' && config.tuningMode !== 'manual') {
+            setConfig({
+              tuningMode: 'manual',
+              manualNotes: tubes.map((t) => t.note),
+            })
+          } else {
+            setConfig({ tuningMode: v as 'scale' | 'manual' })
+          }
+        }} />
       {config.tuningMode === 'scale' && (
         <>
           <div className="row">
@@ -569,14 +581,19 @@ function TuningSection() {
             onClick={() => previewTube(i)}
             title="Click to strike — hover to see this tube's strike analysis">
             <button className="mini" onClick={(e) => { e.stopPropagation(); previewTube(i) }}>♪</button>
-            <span className="note">{t.note}</span>
+            {config.tuningMode === 'manual' ? (
+              <input
+                className="note-input"
+                value={config.manualNotes[i] ?? t.note}
+                onClick={(e) => e.stopPropagation()}
+                onChange={(e) => setManualNote(i, e.target.value)}
+                title="Enter note name (e.g. C5, F#4, Bb4)"
+              />
+            ) : (
+              <span className="note">{t.note}</span>
+            )}
             <span className="freq">{t.freq.toFixed(1)} Hz</span>
             <span className="len">{t.length_mm.toFixed(0)} mm</span>
-            {config.tuningMode === 'manual' && (
-              <input className="note-input" value={config.manualNotes[i] ?? 'A4'}
-                onClick={(e) => e.stopPropagation()}
-                onChange={(e) => setManualNote(i, e.target.value)} />
-            )}
           </div>
         ))}
       </div>
@@ -723,3 +740,75 @@ function OpticsSection() {
     </>
   )
 }
+
+/* ───────────────────────── Manufacturing ───────────────────────── */
+
+function ManufacturingSection() {
+  const { config, tubes } = useStore()
+  const [copied, setCopied] = useState(false)
+
+  const copyCutList = () => {
+    const headers = ['Tube', 'Note', 'Material', 'Outer Ø (mm)', 'Wall (mm)', 'Length (mm)', 'Suspension Pos (mm from top)']
+    const rows = tubes.map((t, i) => {
+      const g = tubeGeometry(config, i)
+      const susp_mm = t.length_mm * config.suspensionPoint
+      const mat = MATERIALS[g.material]?.label ?? g.material
+      const dia = (g.Do * 1000).toFixed(1)
+      const wall = g.solid ? 'solid' : (g.t * 1000).toFixed(2)
+      return [i + 1, t.note, mat, dia, wall, t.length_mm.toFixed(1), susp_mm.toFixed(1)].join('\t')
+    })
+    navigator.clipboard?.writeText([headers.join('\t'), ...rows].join('\n'))
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
+
+  return (
+    <div className="mfg-section">
+      <div className="mfg-table-wrap">
+        <table className="mfg-table">
+          <thead>
+            <tr>
+              <th title="Tube index & note">Tube</th>
+              <th title="Tube material">Material</th>
+              <th title="Outer diameter in mm">Ø</th>
+              <th title="Wall thickness in mm">Wall</th>
+              <th title="Cut length in mm">Length</th>
+              <th title="Suspension hole distance from top end in mm">Susp.</th>
+            </tr>
+          </thead>
+          <tbody>
+            {tubes.map((t, i) => {
+              const g = tubeGeometry(config, i)
+              const susp_mm = t.length_mm * config.suspensionPoint
+              const matLabel = MATERIALS[g.material]?.label ?? g.material
+              const dia_mm = (g.Do * 1000).toFixed(1)
+              const wall_mm = g.solid ? 'solid' : (g.t * 1000).toFixed(2) + ' mm'
+              return (
+                <tr key={i}>
+                  <td>
+                    <span className="mfg-idx">#{i + 1}</span>{' '}
+                    <span className="mfg-note">{t.note}</span>
+                  </td>
+                  <td className="mfg-mat" title={matLabel}>{matLabel}</td>
+                  <td className="mfg-num">{dia_mm} mm</td>
+                  <td className="mfg-num">{wall_mm}</td>
+                  <td className="mfg-num mfg-len">{t.length_mm.toFixed(1)} mm</td>
+                  <td className="mfg-num mfg-susp">{susp_mm.toFixed(1)} mm</td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
+      <div className="mfg-footer">
+        <div className="mfg-hint">
+          Holes drilled @ {(config.suspensionPoint * 100).toFixed(1)}% of length from top
+        </div>
+        <button className="mini-action-btn" onClick={copyCutList} title="Copy cut list to clipboard (tab-separated)">
+          {copied ? '✓ Copied' : '📋 Copy cut list'}
+        </button>
+      </div>
+    </div>
+  )
+}
+

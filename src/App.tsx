@@ -3,6 +3,7 @@ import { Canvas } from '@react-three/fiber'
 import { ChimeScene } from './scene/ChimeScene'
 import { Controls } from './ui/Controls'
 import { WindLines } from './ui/WindLines'
+import { GithubBanner } from './ui/GithubBanner'
 import { audio } from './audio/engine'
 import { useStore } from './state/store'
 
@@ -28,6 +29,7 @@ export default function App() {
 
   return (
     <div className="app">
+      <GithubBanner />
       <WindLines layer="back" />
       <Canvas shadows gl={{ alpha: true, antialias: true }} camera={{ position: [1.4, 1.5, 2.2], fov: 45 }}>
         <ChimeScene />
