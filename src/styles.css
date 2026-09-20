@@ -551,6 +551,10 @@ body { font-family: system-ui, sans-serif; color: #dfe3ea; }
   display: flex;
   flex-direction: column;
   gap: 10px;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  overflow: hidden;
 }
 
 .mfg-analyzer-header {
@@ -592,26 +596,37 @@ body { font-family: system-ui, sans-serif; color: #dfe3ea; }
 .mfg-select-row {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   font-size: 11px;
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
 }
 
 .mfg-select-row label {
   color: #aeb8cc;
   flex: none;
   font-weight: 500;
+  white-space: nowrap;
 }
 
 .mfg-tube-select {
-  flex: 1;
+  flex: 1 1 0;
+  min-width: 0;
+  width: 0;
+  max-width: 100%;
   background: #141b27;
   color: #dfe3ea;
   border: 1px solid #2a3449;
   border-radius: 6px;
-  padding: 4px 8px;
+  padding: 4px 6px;
   font-size: 11px;
   font-family: inherit;
   outline: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  box-sizing: border-box;
 }
 .mfg-tube-select:focus {
   border-color: #6c8cff;
@@ -620,17 +635,50 @@ body { font-family: system-ui, sans-serif; color: #dfe3ea; }
 .mfg-mic-controls {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
+  width: 100%;
+  min-width: 0;
+}
+
+.mfg-play-btn {
+  flex: none;
+  width: 34px;
+  height: 31px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  font-size: 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  border: 1px solid #2e3a50;
+  background: #192233;
+  color: #dfe3ea;
+  user-select: none;
+}
+
+.mfg-play-btn:hover {
+  background: #273752;
+  border-color: #5572a5;
+  color: #fff;
+  transform: scale(1.04);
+}
+
+.mfg-play-btn:active {
+  transform: scale(0.96);
 }
 
 .mfg-mic-btn {
-  flex: 1;
+  flex: 1 1 0;
+  min-width: 0;
+  height: 31px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 6px;
-  padding: 6px 12px;
-  font-size: 12px;
+  padding: 5px 10px;
+  font-size: 11.5px;
   font-weight: 600;
   border-radius: 6px;
   cursor: pointer;
@@ -639,6 +687,9 @@ body { font-family: system-ui, sans-serif; color: #dfe3ea; }
   background: #192233;
   color: #dfe3ea;
   user-select: none;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .mfg-mic-btn:hover {
@@ -850,11 +901,17 @@ body { font-family: system-ui, sans-serif; color: #dfe3ea; }
 .mfg-cut-details {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 4px 8px;
+  gap: 4px 6px;
   font-size: 10.5px;
   color: #aeb8cc;
   padding-top: 4px;
   border-top: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.mfg-cut-details div {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .mfg-cut-details strong {

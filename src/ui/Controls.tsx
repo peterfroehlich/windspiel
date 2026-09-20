@@ -1020,15 +1020,24 @@ function ManufacturingSection() {
           >
             {tubes.map((t, i) => (
               <option key={i} value={i}>
-                #{i + 1} {t.note} ({t.freq.toFixed(1)} Hz) — design {t.length_mm.toFixed(1)} mm
+                #{i + 1} {t.note} ({t.freq.toFixed(1)} Hz) · {t.length_mm.toFixed(1)} mm
               </option>
             ))}
           </select>
         </div>
 
-        {/* Microphone controls */}
+        {/* Microphone and reference tone controls */}
         <div className="mfg-mic-controls">
           <button
+            type="button"
+            className="mfg-play-btn"
+            onClick={() => previewTube(activeIdx)}
+            title={`Play reference tone for Tube #${activeIdx + 1} (${activeTube?.note}, ${targetFreq.toFixed(1)} Hz)`}
+          >
+            ▶️
+          </button>
+          <button
+            type="button"
             className={`mfg-mic-btn ${isListening ? 'active' : ''}`}
             onClick={toggleMic}
             title={isListening ? 'Stop microphone' : 'Enable microphone to analyze tube strike frequency'}
@@ -1203,10 +1212,10 @@ function ManufacturingSection() {
             </div>
 
             <div className="mfg-cut-details">
-              <div>New cut length: <strong>{newLength_mm.toFixed(1)} mm</strong></div>
-              <div>Susp. hole: <strong>{newSusp_mm.toFixed(1)} mm</strong> from top</div>
-              <div>Target pitch: <strong>{targetFreq.toFixed(1)} Hz</strong> ({activeTube?.note})</div>
-              <div>Pitch offset: <strong>{centsDeviation > 0 ? '+' : ''}{centsDeviation.toFixed(1)} cents</strong></div>
+              <div>Cut length: <strong>{newLength_mm.toFixed(1)} mm</strong></div>
+              <div>Susp. hole: <strong>{newSusp_mm.toFixed(1)} mm</strong></div>
+              <div>Target: <strong>{targetFreq.toFixed(1)} Hz</strong> ({activeTube?.note})</div>
+              <div>Offset: <strong>{centsDeviation > 0 ? '+' : ''}{centsDeviation.toFixed(1)}¢</strong></div>
             </div>
 
             {cutEstimate.status === 'sharp' && (
