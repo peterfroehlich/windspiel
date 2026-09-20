@@ -42,6 +42,20 @@ export class AudioEngine {
     }
   }
 
+  /** Stop all actively sounding notes immediately and kill reverb tails. */
+  stopAll() {
+    const now = this.ctx?.currentTime ?? 0
+    for (const src of this.activeSources) {
+      try { src.stop(now) } catch { /* already stopped */ }
+    }
+    this.activeSources.clear()
+    if (this.ctx && this.reverbGain) {
+      this.reverbGain.gain.cancelScheduledValues(now)
+      this.reverbGain.gain.setValueAtTime(0, now)
+      this.reverbGain.gain.setValueAtTime(this.muted ? 0 : 0.25, now + 0.05)
+    }
+  }
+
   /** Register a voice for mute-kill tracking. */
   private track(src: AudioScheduledSourceNode) {
     this.activeSources.add(src)

@@ -759,7 +759,7 @@ function OpticsSection() {
 /* ───────────────────────── Manufacturing ───────────────────────── */
 
 function ManufacturingSection() {
-  const { config, tubes } = useStore()
+  const { config, tubes, setWindOn } = useStore()
   const [copied, setCopied] = useState(false)
   const wrapRef = useRef<HTMLDivElement>(null)
   const [canScrollRight, setCanScrollRight] = useState(false)
@@ -846,6 +846,10 @@ function ManufacturingSection() {
   }, [])
 
   const startMic = async () => {
+    // Disable wind and stop any note currently playing
+    setWindOn(false)
+    audio.stopAll()
+
     setMicError(null)
     setCapturedFreq(null)
     setLiveFreq(null)
@@ -888,8 +892,13 @@ function ManufacturingSection() {
   }
 
   const toggleMic = () => {
-    if (isListening) stopMic()
-    else startMic()
+    if (isListening) {
+      stopMic()
+    } else {
+      setWindOn(false)
+      audio.stopAll()
+      startMic()
+    }
   }
 
   // Active frequency to analyze: manual typed input || strike captured || live
