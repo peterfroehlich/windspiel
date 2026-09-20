@@ -408,8 +408,3 @@ export function ChimeScene() {
     </>
   )
 }
-      <ContactShadows position={[0, -0.4, 0]} opacity={0.4} scale={4} blur={2.5} far={2} />
-      <OrbitControls target={[0, 1.2, 0]} enablePan={true} screenSpacePanning={true} minDistance={0.8} maxDistance={6} />
-    </>
-  )
-}

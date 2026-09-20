@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { strikeWeights } from '../physics/modes'
-import { useStore, tubeSpec, maxDrop_mm, optimalDrop_mm, equalLoudnessDrop_mm } from './store'
+import { useStore, tubeSpec, maxDrop_mm, optimalDrop_mm, equalLoudnessDrop_mm, tubeSuspension } from './store'
 
 const st = () => useStore.getState()
 
@@ -142,3 +142,47 @@ describe('derived helpers', () => {
       .toBeLessThan(spread(optimalDrop_mm(st().tubes) / 1000))
   })
 })
+
+describe('tubeSuspension & sameAbsoluteSuspension', () => {
+  it('default uses relative fraction (22.4%) for each tube', () => {
+    const { config, tubes } = st()
+    expect(config.sameAbsoluteSuspension).toBe(false)
+    for (let i = 0; i < tubes.length; i++) {
+      const susp = tubeSuspension(config, tubes, i)
+      expect(susp.fraction).toBeCloseTo(0.224, 4)
+      expect(susp.mm).toBeCloseTo(tubes[i].length_mm * 0.224, 2)
+    }
+  })
+
+  it('sameAbsoluteSuspension gives all tubes the same absolute suspension distance in mm', () => {
+    st().setConfig({ sameAbsoluteSuspension: true })
+    const { config, tubes } = st()
+    const targetMm = tubes[0].length_mm * config.suspensionPoint
+    for (let i = 0; i < tubes.length; i++) {
+      const susp = tubeSuspension(config, tubes, i)
+      expect(susp.mm).toBeCloseTo(targetMm, 2)
+      expect(susp.fraction).toBeCloseTo(targetMm / tubes[i].length_mm, 4)
+    }
+  })
+
+  it('per-tube override takes precedence over both relative and same-absolute suspension', () => {
+    st().setTubeOverride(2, { suspensionPoint: 0.32 })
+    const { config, tubes } = st()
+    const susp2 = tubeSuspension(config, tubes, 2)
+    expect(susp2.fraction).toBeCloseTo(0.32, 4)
+    expect(susp2.mm).toBeCloseTo(tubes[2].length_mm * 0.32, 2)
+
+    // When sameAbsoluteSuspension is toggled on, tube 2 still keeps its manual override
+    st().setConfig({ sameAbsoluteSuspension: true })
+    const susp2Abs = tubeSuspension(st().config, st().tubes, 2)
+    expect(susp2Abs.fraction).toBeCloseTo(0.32, 4)
+    expect(susp2Abs.mm).toBeCloseTo(st().tubes[2].length_mm * 0.32, 2)
+
+    // Resetting override reverts to standard calculation
+    st().setTubeOverride(2, { suspensionPoint: undefined })
+    const susp2Reset = tubeSuspension(st().config, st().tubes, 2)
+    const targetMm = st().tubes[0].length_mm * st().config.suspensionPoint
+    expect(susp2Reset.mm).toBeCloseTo(targetMm, 2)
+  })
+})
+
