@@ -6,8 +6,22 @@ import { WindLines } from './ui/WindLines'
 import { GithubBanner } from './ui/GithubBanner'
 import { audio } from './audio/engine'
 import { useStore } from './state/store'
+import { parseConfigFromUrl } from './state/share'
 
 export default function App() {
+  // Load shared configuration from URL parameter (?config=... or ?c=...) on mount & popstate
+  useEffect(() => {
+    const applySharedConfig = () => {
+      const shared = parseConfigFromUrl()
+      if (shared) {
+        useStore.getState().setConfig(shared)
+      }
+    }
+    applySharedConfig()
+    window.addEventListener('popstate', applySharedConfig)
+    return () => window.removeEventListener('popstate', applySharedConfig)
+  }, [])
+
   // Browsers only allow AudioContext after a user gesture — arm it on the
   // first click/keypress so wind-driven strikes are audible afterwards.
   // On init, apply the configured volume (engine default is hardcoded).

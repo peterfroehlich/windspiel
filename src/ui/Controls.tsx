@@ -15,6 +15,7 @@ import { HELP } from './help'
 import { PhysicsModal } from './PhysicsModal'
 import { DEFAULT_CONFIG } from '../state/store'
 import { listPresets as presetsList, savePreset, loadPreset, deletePreset } from '../state/presets'
+import { generateShareUrl, copyToClipboard } from '../state/share'
 import { estimateCut, freqToNote, calculateMaterialCalibration } from '../physics/tuning'
 import { AudioPitchTracker } from '../audio/pitchDetector'
 import { downloadStrikerSTL } from '../physics/stlExport'
@@ -382,10 +383,45 @@ export function Controls() {
     setSaveOpen(false)
   }
 
+  // Share configuration link (base64 URL parameter)
+  const [shareCopied, setShareCopied] = useState(false)
+  const [shareToast, setShareToast] = useState(false)
+  const [sharePop, setSharePop] = useState(false)
+  const [shareUrl, setShareUrl] = useState('')
+
+  async function handleShare(e?: React.MouseEvent) {
+    const url = generateShareUrl(useStore.getState().config)
+    setShareUrl(url)
+    if (typeof window !== 'undefined') {
+      window.history.replaceState(null, '', url)
+    }
+    if (e?.altKey || e?.shiftKey) {
+      setSharePop(true)
+      return
+    }
+    const ok = await copyToClipboard(url)
+    if (ok) {
+      setShareCopied(true)
+      setShareToast(true)
+      setTimeout(() => setShareCopied(false), 2500)
+      setTimeout(() => setShareToast(false), 3500)
+    } else {
+      setSharePop(true)
+    }
+  }
+
   return (
     <div className="sidebar">
       <div className="panel-header">
-        <button className="reset-btn" onClick={() => reset()} title="Reset all settings to default">
+        <button className="reset-btn" onClick={() => {
+          reset()
+          if (typeof window !== 'undefined' && window.location.search) {
+            const url = new URL(window.location.href)
+            url.searchParams.delete('config')
+            url.searchParams.delete('c')
+            window.history.replaceState(null, '', url.pathname + (url.search ? url.search : '') + url.hash)
+          }
+        }} title="Reset all settings to default">
           ⟲ Reset
         </button>
         <button className="icon-btn" onClick={() => importInputRef.current?.click()} title="Import spec (JSON)">📥</button>
@@ -394,6 +430,39 @@ export function Controls() {
           onChange={(e) => { const f = e.target.files?.[0]; if (f) importSpec(f); e.target.value = '' }} />
         <button className="icon-btn" onClick={exportSpec} title="Export spec (JSON)">📤</button>
         <button className="icon-btn" onClick={() => setSaveOpen((v) => !v)} title="Save / load configurations (browser storage)">💾</button>
+        <button
+          className={`icon-btn ${shareCopied ? 'copied' : ''}`}
+          onClick={handleShare}
+          title={shareCopied ? 'Link copied to clipboard!' : 'Share configuration link (copies URL with base64 config)'}
+          aria-label="Share configuration link"
+        >
+          {shareCopied ? '✓' : '🔗'}
+        </button>
+        {sharePop && (
+          <div className="save-pop share-pop">
+            <div className="save-title">Share configuration</div>
+            <p style={{ fontSize: '11px', color: '#8892a6', margin: '4px 0 8px' }}>
+              Copy this link to share the current wind chime configuration:
+            </p>
+            <input
+              className="save-name"
+              value={shareUrl}
+              readOnly
+              onClick={(e) => (e.target as HTMLInputElement).select()}
+              autoFocus
+            />
+            <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end', marginTop: '6px' }}>
+              <button className="adv-reset" style={{ padding: '4px 8px' }} onClick={() => setSharePop(false)}>Close</button>
+              <button className="btn" onClick={async () => {
+                await copyToClipboard(shareUrl)
+                setShareCopied(true)
+                setTimeout(() => setShareCopied(false), 2500)
+              }}>
+                {shareCopied ? '✓ Copied' : 'Copy link'}
+              </button>
+            </div>
+          </div>
+        )}
         {saveOpen && (
           <div className="save-pop">
             <input className="save-name" placeholder="Name this chime…" value={saveName}
@@ -423,6 +492,12 @@ export function Controls() {
         </button>
         <button className="physics-btn" onClick={() => setPhysicsOpen(true)} title="All the physics">⚛</button>
       </div>
+      {shareToast && (
+        <div className="share-toast" role="status">
+          <span className="share-toast-text">🔗 Link copied to clipboard!</span>
+          <button className="share-toast-close" onClick={() => setShareToast(false)} aria-label="Close">✕</button>
+        </div>
+      )}
       {physicsOpen && <PhysicsModal onClose={() => setPhysicsOpen(false)} />}
 
       <div className="main-tabs" role="tablist" aria-label="Configuration tabs">
