@@ -214,6 +214,9 @@ function Sail({ dropY }: { dropY: number }) {
   const { config, tubes } = useStore()
   const ref = useRef<THREE.Mesh>(null)
   const stringRef = useRef<THREE.Line>(null)
+  const sailArea = config.sailArea_cm2 ?? 80
+  const scale = Math.sqrt(sailArea / 80)
+  const halfH = 0.06 * scale
   const wind = windSim.state
 
   useFrame(() => {
@@ -230,7 +233,7 @@ function Sail({ dropY }: { dropY: number }) {
       const strikerY = -dropY - config.strikerDrop_mm / 1000
       const yTop = strikerY - strikerDims.height_mm / 2000
       pos.setXYZ(0, wind.x, yTop, wind.z)
-      pos.setXYZ(1, wind.sailX, ref.current!.position.y + 0.06, wind.sailZ)
+      pos.setXYZ(1, wind.sailX, ref.current!.position.y + halfH, wind.sailZ)
       pos.needsUpdate = true
     }
   })
@@ -240,7 +243,7 @@ function Sail({ dropY }: { dropY: number }) {
   const maxBottom = tubes.length
     ? Math.max(...tubes.map((_, i) => tubeMountingPosition(config, tubes, i).bottom_mm)) / 1000
     : 0.5
-  const y = -(maxBottom + 0.05 + 0.06)   // lowest tube end + 5cm clearance + half sail height
+  const y = -(maxBottom + 0.05 + halfH)   // lowest tube end + 5cm clearance + half sail height
   const geo = useMemo(() => {
     const g = new THREE.BufferGeometry()
     g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(6), 3))
@@ -255,10 +258,10 @@ function Sail({ dropY }: { dropY: number }) {
       case 'diamond': {
         const s = new THREE.Shape()
         s.moveTo(0, 0.08); s.lineTo(0.05, 0); s.lineTo(0, -0.08); s.lineTo(-0.05, 0); s.closePath()
-        return <mesh ref={ref} position={[0, y, 0]} castShadow geometry={new THREE.ShapeGeometry(s)}>{mat}</mesh>
+        return <mesh ref={ref} position={[0, y, 0]} scale={[scale, scale, 1]} castShadow geometry={new THREE.ShapeGeometry(s)}>{mat}</mesh>
       }
       case 'circle':
-        return <mesh ref={ref} position={[0, y, 0]} castShadow>
+        return <mesh ref={ref} position={[0, y, 0]} scale={[scale, scale, 1]} castShadow>
           <circleGeometry args={[0.055, 32]} />{mat}
         </mesh>
       case 'teardrop': {
@@ -266,14 +269,14 @@ function Sail({ dropY }: { dropY: number }) {
         s.moveTo(0, 0.09)
         s.bezierCurveTo(0.055, 0.03, 0.05, -0.04, 0, -0.07)
         s.bezierCurveTo(-0.05, -0.04, -0.055, 0.03, 0, 0.09)
-        return <mesh ref={ref} position={[0, y, 0]} castShadow geometry={new THREE.ShapeGeometry(s, 24)}>{mat}</mesh>
+        return <mesh ref={ref} position={[0, y, 0]} scale={[scale, scale, 1]} castShadow geometry={new THREE.ShapeGeometry(s, 24)}>{mat}</mesh>
       }
       case 'feather': // narrow vertical slat
-        return <mesh ref={ref} position={[0, y, 0]} castShadow>
+        return <mesh ref={ref} position={[0, y, 0]} scale={[scale, scale, 1]} castShadow>
           <boxGeometry args={[0.028, 0.13, 0.003]} />{mat}
         </mesh>
       default: // rectangle
-        return <mesh ref={ref} position={[0, y, 0]} castShadow>
+        return <mesh ref={ref} position={[0, y, 0]} scale={[scale, scale, 1]} castShadow>
           <boxGeometry args={[0.08, 0.12, 0.004]} />{mat}
         </mesh>
     }
@@ -344,7 +347,8 @@ function Simulator() {
       strikerDims.diameter_mm / 2000,
       strikerY,
       Math.max(0.1, sailLen),
-      config.sailMass_g
+      config.sailMass_g,
+      config.sailArea_cm2 ?? 80
     )
     if (useStore.getState().windOn && useStore.getState().audioArmed) {
       windSim.update(dt, { strength: config.windStrength, gustFreq: config.gustFrequency })

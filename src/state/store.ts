@@ -48,6 +48,7 @@ export interface ChimeConfig {
   windStrength: number          // 0..1
   gustFrequency: number         // gusts per second
   sailMass_g: number            // wind-catcher mass (areal density of the board)
+  sailArea_cm2?: number         // wind-catcher surface area in cm² (default: 80 cm²)
   volume: number
   // Optics: top plate + sail shape/color
   plateShape: string            // disc | ring | octagon | square
@@ -87,6 +88,7 @@ export const DEFAULT_CONFIG: ChimeConfig = {
   strikerDrop_mm: 0,   // replaced below: optimal center-strike of default tuning
   windStrength: 0.35,
   sailMass_g: 30,
+  sailArea_cm2: 80,
   plateShape: 'disc',
   plateRadius_mm: 90,
   plateColor: '#3a2f24',

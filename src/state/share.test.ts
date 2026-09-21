@@ -6,8 +6,10 @@ import {
   decodeConfigFromBase64,
   generateShareUrl,
   parseConfigFromUrl,
+  bytesToBase64,
 } from './share'
 import { DEFAULT_CONFIG, ChimeConfig } from './store'
+import { gzipSync, zlibSync, strToU8 } from 'fflate'
 
 describe('share utility: base64 encoding/decoding', () => {
   it('round-trips standard ascii strings', () => {
@@ -48,8 +50,14 @@ describe('share utility: base64 encoding/decoding', () => {
   })
 })
 
-describe('share utility: config serialization & validation', () => {
-  it('round-trips default config completely', () => {
+describe('share utility: config serialization, compression & backwards compatibility', () => {
+  it('compresses JSON to make the URL significantly shorter than uncompressed base64', () => {
+    const uncompressedB64 = toBase64(JSON.stringify(DEFAULT_CONFIG))
+    const compressedB64 = encodeConfigToBase64(DEFAULT_CONFIG)
+    expect(compressedB64.length).toBeLessThan(uncompressedB64.length * 0.7) // at least 30% shorter
+  })
+
+  it('round-trips default config completely via compressed format', () => {
     const b64 = encodeConfigToBase64(DEFAULT_CONFIG)
     const parsed = decodeConfigFromBase64(b64)
     expect(parsed).not.toBeNull()
@@ -57,6 +65,40 @@ describe('share utility: config serialization & validation', () => {
     expect(parsed?.material).toBe(DEFAULT_CONFIG.material)
     expect(parsed?.tubeAlignment).toBe(DEFAULT_CONFIG.tubeAlignment)
     expect(parsed?.strikerForm).toBe(DEFAULT_CONFIG.strikerForm)
+    expect(parsed?.sailArea_cm2).toBe(DEFAULT_CONFIG.sailArea_cm2)
+  })
+
+  it('still decodes UNCOMPRESSED sharing URLs for backwards compatibility', () => {
+    const legacyConfig: Partial<ChimeConfig> = {
+      tubeCount: 8,
+      material: 'copper',
+      strikerForm: 'multisided',
+      tubeAlignment: 'centerStrike',
+      sailArea_cm2: 120,
+    }
+    const legacyUncompressedB64 = toBase64(JSON.stringify(legacyConfig))
+    const parsed = decodeConfigFromBase64(legacyUncompressedB64)
+    expect(parsed).not.toBeNull()
+    expect(parsed?.tubeCount).toBe(8)
+    expect(parsed?.material).toBe('copper')
+    expect(parsed?.strikerForm).toBe('multisided')
+    expect(parsed?.tubeAlignment).toBe('centerStrike')
+    expect(parsed?.sailArea_cm2).toBe(120)
+  })
+
+  it('decodes gzip and zlib compressed payloads', () => {
+    const cfg = { tubeCount: 7, material: 'bronze' }
+    const jsonStr = JSON.stringify(cfg)
+    
+    // Test gzip
+    const gzBytes = gzipSync(strToU8(jsonStr))
+    const gzB64 = bytesToBase64(gzBytes)
+    expect(decodeConfigFromBase64(gzB64)?.tubeCount).toBe(7)
+
+    // Test zlib
+    const zlBytes = zlibSync(strToU8(jsonStr))
+    const zlB64 = bytesToBase64(zlBytes)
+    expect(decodeConfigFromBase64(zlB64)?.material).toBe('bronze')
   })
 
   it('sanitizes and filters unknown fields', () => {

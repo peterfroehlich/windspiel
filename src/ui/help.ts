@@ -175,6 +175,10 @@ export const HELP: Record<string, string> = {
     'changes how much of the swinging is visible: a big flat rectangle catches the eye, ' +
     'a feather slat looks subtle. Color is fully customizable.',
 
+  sailArea:
+    'Surface area of the wind catcher in cm². Larger sails capture more wind energy and swing ' +
+    'more readily in gentle breezes, while smaller sails need stiffer gusts to move the striker.',
+
   exportSpec:
     'Downloads the current design as JSON: every note, frequency, computed tube length ' +
     'and decay time — a build sheet for actually making this chime in a workshop.',

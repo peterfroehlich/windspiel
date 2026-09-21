@@ -11,6 +11,7 @@ body { font-family: system-ui, sans-serif; color: #dfe3ea; }
   border-left: 1px solid #2a3242;
   padding: 12px;
   overflow: hidden;
+  z-index: 20;
 }
 
 .panel-header {

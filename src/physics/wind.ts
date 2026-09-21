@@ -42,7 +42,7 @@ export class WindSim {
   private pendulumLen = 0.12  // top plate -> striker distance
   private sailLen = 0.35      // striker -> sail distance
 
-  setGeometry(count: number, ringR: number, tubeRo: number, strikerR: number, pendulumLen: number, sailLen: number, sailMass_g = 30) {
+  setGeometry(count: number, ringR: number, tubeRo: number, strikerR: number, pendulumLen: number, sailLen: number, sailMass_g = 30, sailArea_cm2 = 80) {
     this.count = count
     this.ringR = ringR
     this.tubeRo = tubeRo
@@ -50,6 +50,7 @@ export class WindSim {
     this.pendulumLen = pendulumLen
     this.sailLen = sailLen
     this.sailMass_g = sailMass_g
+    this.sailArea_cm2 = sailArea_cm2
     // normalized mass for tension scaling: 5 g → 0, 200 g → 1
     this.sailMassNorm = Math.max(0, Math.min(1, (sailMass_g - 5) / 195))
   }
@@ -63,6 +64,7 @@ export class WindSim {
   private driftSeed = Math.random() * 100
   private kickTimer = 0
   private sailMass_g = 30      // wind-catcher mass (areal density of board)
+  private sailArea_cm2 = 80    // wind-catcher surface area in cm²
   private sailMassNorm = 0.5   // 0..1 normalized for tension scaling
   private cooldown: number[] = []
 
@@ -144,13 +146,13 @@ export class WindSim {
     st.x += st.vx * dt
     st.z += st.vz * dt
 
-    // --- 4. sail: wind force F ∝ area (fixed); acceleration = F / mass ---
+    // --- 4. sail: wind force F ∝ area; acceleration = F / mass ---
     // Light sail (10 g, acrylic sheet): a≈F/m high → dances in every puff,
     // lulls snap it back. Heavy sail (200 g, thick hardwood): sluggish, only
     // real gusts move it — and via tension it drags the striker more steadily.
-    const F_SAIL = 2.0   // wind force on the fixed-area board [N·s²/m³ scaled]
     const massFactor = 30 / Math.max(5, this.sailMass_g)   // relative to 30 g ref
-    const sailDrive = 0.9 * 2.2 * massFactor
+    const areaFactor = (this.sailArea_cm2 ?? 80) / 80
+    const sailDrive = 0.9 * 2.2 * massFactor * areaFactor
     const sOm2 = g0 / Math.max(0.05, this.sailLen)
     const sailFx = (st.windX - this.sailVX) * sailDrive
     const sailFz = (st.windZ - this.sailVZ) * sailDrive

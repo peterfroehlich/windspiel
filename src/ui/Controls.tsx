@@ -344,18 +344,18 @@ export function Controls() {
     a.click()
   }
 
-  const [mainTab, setMainTab] = useState<MainTab>('simulation')
+  const [mainTab, setMainTab] = useState<MainTab>('design')
 
-  // default: Simulation has Wind and Optics open (both expanded);
-  // Design has Tubes and Tuning open, Striker folded;
+  // default: Design has Tubes, Tuning, Striker, and Mounting open;
+  // Simulation has Wind and Optics open;
   // Manufacturing has Overview, Tuning Tool, and Calibration Tool open.
   const [open, setOpen] = useState<Record<SectionId, boolean>>({
     wind: true,
     optics: true,
     tubes: true,
-    mounting: true,
     tuning: true,
-    striker: false,
+    striker: true,
+    mounting: true,
     mfgOverview: true,
     mfgTuning: true,
     mfgCalibration: true,
@@ -546,14 +546,14 @@ export function Controls() {
             <Section id="tubes" title="Tubes" open={open} toggle={toggle}>
               <TubesSection />
             </Section>
-            <Section id="mounting" title="Mounting" open={open} toggle={toggle}>
-              <MountingSection />
-            </Section>
             <Section id="tuning" title="Tuning" open={open} toggle={toggle}>
               <TuningSection />
             </Section>
             <Section id="striker" title="Striker" open={open} toggle={toggle}>
               <StrikerSection />
+            </Section>
+            <Section id="mounting" title="Mounting" open={open} toggle={toggle}>
+              <MountingSection />
             </Section>
           </>
         )}
@@ -992,6 +992,8 @@ function OpticsSection() {
       <Select label="Sail shape" value={config.sailType} helpId="sailShape"
         options={SAIL_TYPES as unknown as { id: string; label: string }[]}
         onChange={(v) => setConfig({ sailType: v })} />
+      <Slider label="Sail area" min={20} max={250} step={5} fmt={(v) => v + ' cm²'} helpId="sailArea"
+        value={config.sailArea_cm2 ?? 80} onChange={(v) => setConfig({ sailArea_cm2: v })} />
       <ColorRow label="Sail color" value={config.sailColor}
         onChange={(c) => setConfig({ sailColor: c })} />
     </>

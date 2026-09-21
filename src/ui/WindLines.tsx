@@ -51,7 +51,10 @@ export function WindLines({ layer = 'front' }: { layer?: Layer }) {
     let W = 0, H = 0
 
     const resize = () => {
-      W = window.innerWidth; H = window.innerHeight
+      const sidebarEl = document.querySelector('.sidebar')
+      const sidebarW = sidebarEl ? sidebarEl.getBoundingClientRect().width : 342
+      W = Math.max(100, window.innerWidth - sidebarW)
+      H = window.innerHeight
       const dpr = Math.min(window.devicePixelRatio || 1, 2)
       canvas.width = W * dpr
       canvas.height = H * dpr
@@ -219,8 +222,15 @@ export function WindLines({ layer = 'front' }: { layer?: Layer }) {
     <canvas
       ref={canvasRef}
       style={{
-        position: 'fixed', inset: 0, pointerEvents: 'none',
-        zIndex: cfg.z, opacity: 0.92, mixBlendMode: 'screen',
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        bottom: 0,
+        right: '342px',
+        pointerEvents: 'none',
+        zIndex: cfg.z,
+        opacity: 0.92,
+        mixBlendMode: 'screen',
       }}
     />
   )
