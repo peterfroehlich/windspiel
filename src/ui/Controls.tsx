@@ -14,6 +14,7 @@ import { audio } from '../audio/engine'
 import { HELP } from './help'
 import { PhysicsModal } from './PhysicsModal'
 import { ManufacturingTipsModal } from './ManufacturingTipsModal'
+import { DesignTipsModal } from './DesignTipsModal'
 import { DEFAULT_CONFIG } from '../state/store'
 import { listPresets as presetsList, savePreset, loadPreset, deletePreset } from '../state/presets'
 import { generateShareUrl, copyToClipboard } from '../state/share'
@@ -304,6 +305,7 @@ function AcousticsInfo({ tubeIndex }: { tubeIndex?: number | null }) {
 export function Controls() {
   const { reset, windOn, setWindOn } = useStore()
   const [physicsOpen, setPhysicsOpen] = useState(false)
+  const [designTipsOpen, setDesignTipsOpen] = useState(false)
 
   const importInputRef = useRef<HTMLInputElement>(null)
 
@@ -491,7 +493,6 @@ export function Controls() {
           title={windOn ? 'Stop the wind' : 'Start the wind'}>
           {windOn ? '🌬️' : '🚫'}
         </button>
-        <button className="physics-btn" onClick={() => setPhysicsOpen(true)} title="All the physics">⚛</button>
       </div>
       {shareToast && (
         <div className="share-toast" role="status">
@@ -500,6 +501,7 @@ export function Controls() {
         </div>
       )}
       {physicsOpen && <PhysicsModal onClose={() => setPhysicsOpen(false)} />}
+      {designTipsOpen && <DesignTipsModal onClose={() => setDesignTipsOpen(false)} />}
 
       <div className="main-tabs" role="tablist" aria-label="Configuration tabs">
         <button
@@ -534,6 +536,16 @@ export function Controls() {
       <div className="sections">
         {mainTab === 'simulation' && (
           <>
+            <div className="tab-tips-bar">
+              <button
+                type="button"
+                className="tab-tips-btn sim-tips-btn"
+                onClick={() => setPhysicsOpen(true)}
+                title="Acoustic physics, Euler-Bernoulli formulas, partials, and radiation models"
+              >
+                ⚛ Physics! & Formulas
+              </button>
+            </div>
             <Section id="wind" title="Wind" open={open} toggle={toggle}>
               <WindSection />
             </Section>
@@ -544,6 +556,16 @@ export function Controls() {
         )}
         {mainTab === 'design' && (
           <>
+            <div className="tab-tips-bar">
+              <button
+                type="button"
+                className="tab-tips-btn design-tips-btn"
+                onClick={() => setDesignTipsOpen(true)}
+                title="Chime design tips: tube mounting & string clearance, alloy selection, and sustain optimization"
+              >
+                💡 Design Tips & Acoustic Guide
+              </button>
+            </div>
             <Section id="tubes" title="Tubes" open={open} toggle={toggle}>
               <TubesSection />
             </Section>
@@ -1283,11 +1305,12 @@ function ManufacturingTab({
 
   return (
     <>
-      <div className="mfg-tips-bar">
+      <div className="tab-tips-bar">
         <button
-          className="mfg-tips-btn"
+          type="button"
+          className="tab-tips-btn mfg-tips-btn"
           onClick={() => setTipsOpen(true)}
-          title="Manufacturing tips: extruded vs cold-drawn tubing, wall thickness, and workshop golden rule"
+          title="Manufacturing tips: extruded vs cold-drawn tubing, cutting & drilling, and workshop golden rule"
         >
           🛠️ Manufacturing & Workshop Tips
         </button>

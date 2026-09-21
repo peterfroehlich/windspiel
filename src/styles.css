@@ -435,10 +435,12 @@ body { font-family: system-ui, sans-serif; color: #dfe3ea; }
   transform: scale(1.15);
 }
 
-/* ───────────────────────── Manufacturing Section ───────────────────────── */
+/* ───────────────────────── Tab Tips Header Buttons ───────────────────────── */
+.tab-tips-bar,
 .mfg-tips-bar {
   margin-bottom: 10px;
 }
+.tab-tips-btn,
 .mfg-tips-btn {
   width: 100%;
   display: flex;
@@ -446,15 +448,52 @@ body { font-family: system-ui, sans-serif; color: #dfe3ea; }
   justify-content: center;
   gap: 8px;
   padding: 8px 12px;
-  background: linear-gradient(135deg, #1b2434 0%, #151d2a 100%);
-  border: 1px solid #2d3b52;
   border-radius: 8px;
-  color: #e2e8f0;
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.18s ease;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  text-align: center;
+}
+.tab-tips-btn:active,
+.mfg-tips-btn:active {
+  transform: translateY(0);
+}
+
+/* Simulation: Physics! button */
+.sim-tips-btn {
+  background: linear-gradient(135deg, #122820 0%, #0d1e17 100%);
+  border: 1px solid #224d38;
+  color: #a7f3d0;
+}
+.sim-tips-btn:hover {
+  background: linear-gradient(135deg, #19382c 0%, #11281f 100%);
+  border-color: #34d399;
+  color: #ffffff;
+  box-shadow: 0 4px 14px rgba(52, 211, 153, 0.22);
+  transform: translateY(-1px);
+}
+
+/* Design: Design Tips button */
+.design-tips-btn {
+  background: linear-gradient(135deg, #2b2214 0%, #1f180d 100%);
+  border: 1px solid #543f1f;
+  color: #fde68a;
+}
+.design-tips-btn:hover {
+  background: linear-gradient(135deg, #3d2f19 0%, #281e0f 100%);
+  border-color: #fbbf24;
+  color: #ffffff;
+  box-shadow: 0 4px 14px rgba(245, 158, 11, 0.22);
+  transform: translateY(-1px);
+}
+
+/* Manufacturing: Workshop Tips button */
+.mfg-tips-btn {
+  background: linear-gradient(135deg, #1b2434 0%, #151d2a 100%);
+  border: 1px solid #2d3b52;
+  color: #e2e8f0;
 }
 .mfg-tips-btn:hover {
   background: linear-gradient(135deg, #24324a 0%, #1c273a 100%);
@@ -462,9 +501,6 @@ body { font-family: system-ui, sans-serif; color: #dfe3ea; }
   color: #ffffff;
   box-shadow: 0 4px 14px rgba(108, 140, 255, 0.2);
   transform: translateY(-1px);
-}
-.mfg-tips-btn:active {
-  transform: translateY(0);
 }
 
 .mfg-section {

@@ -98,53 +98,7 @@ export function ManufacturingTipsModal({ onClose }: { onClose: () => void }) {
             </p>
           </Section>
 
-          <Section title="2. Alloy Selection: Aluminium & Brass">
-            <p>
-              <b>Aluminium — EN AW-6060-T66 (AlMgSi0.5):</b> The gold standard alloy for wind chimes. Precipitation hardening (Mg₂Si precipitates)
-              pins crystal dislocations, giving an outstanding quality factor (Q ≈ 3000–3500) and long singing sustain (6–10 s).
-            </p>
-            <p>
-              <b>Eloxieren (Anodizing):</b> Highly recommended for aluminium. It creates a 15–25 µm diamond-hard ceramic Al₂O₃ layer (400–500 HV).
-              It preserves 100% of acoustic sustain while preventing weather pitting, chalking, and striker indentations.
-            </p>
-            <Callout title="⚠️ Avoid Powder Coating & Thick Paint" type="info">
-              Unlike anodizing, powder coating and paint add a 60–120 µm viscoelastic plastic layer that dampens acoustic vibrations.
-              Sustain drops from ~8 seconds to under 2 seconds, turning your chime into a muffled clonk.
-            </Callout>
-
-            <h4 style={{ color: '#d4af5a', margin: '14px 0 6px', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-              🎺 Brass Selection: CuZn37 (Ms63) vs. CuZn39Pb3 (Ms58)
-            </h4>
-            <table className="pm-table" style={{ margin: '8px 0 10px' }}>
-              <thead>
-                <tr style={{ borderBottom: '1px solid #2a3242', color: '#d4af5a', textAlign: 'left' }}>
-                  <th style={{ padding: '6px 8px' }}>Alloy</th>
-                  <th style={{ padding: '6px 8px' }}>State / Temper</th>
-                  <th style={{ padding: '6px 8px' }}>Sustain (Q-Factor)</th>
-                  <th style={{ padding: '6px 8px' }}>Recommendation & Sound</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td><b>CuZn37 (Ms63)</b></td>
-                  <td><i>ziehhart / presshart</i> (lead-free α-brass)</td>
-                  <td><b>Q ≈ 2000–2500</b> (~5–7 s sustain)</td>
-                  <td><b>🏆 Highly Recommended.</b> Pure, singing bell-like ring. Matches the app's "Brass" preset.</td>
-                </tr>
-                <tr>
-                  <td><b>CuZn39Pb3 (Ms58)</b></td>
-                  <td><i>gezogen</i> (contains ~3% lead for CNC turning)</td>
-                  <td><b>Q ≈ 800–1200</b> (~2–3 s sustain)</td>
-                  <td><b>⚠️ Shorter sustain.</b> Microscopic lead droplets act as acoustic dampers, yielding a drier, darker, shorter ring.</td>
-                </tr>
-              </tbody>
-            </table>
-            <p style={{ fontSize: '11px', color: '#8892a6', margin: '4px 0 0' }}>
-              💡 <b>Brass rule of thumb:</b> Always choose <b>CuZn37 (Ms63) ziehhart</b> for musical chimes. Because sound travels slower in brass (c ≈ 3480 m/s vs 5055 m/s in Al), brass tubes are ~17% shorter but over 3× heavier for the exact same pitch.
-            </p>
-          </Section>
-
-          <Section title="3. Cutting & Drilling Best Practices">
+          <Section title="2. Cutting & Drilling Best Practices">
             <ul className="pm-list">
               <li>
                 <b>Miter Saw Blade:</b> Use a fine-toothed carbide blade (60–80 teeth, negative rake angle) designed for non-ferrous metals.
@@ -164,7 +118,7 @@ export function ManufacturingTipsModal({ onClose }: { onClose: () => void }) {
             </ul>
           </Section>
 
-          <Section title="4. Cord & Striker Setup">
+          <Section title="3. Cord & Striker Setup">
             <ul className="pm-list">
               <li>
                 <b>Cord Material:</b> Use braided polyester, Dacron, or Spectra/Kevlar cord. Never use nylon monofilament (stretches and fails in UV)
