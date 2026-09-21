@@ -13,6 +13,7 @@ import { tubeFrequencies } from '../physics/tubes'
 import { audio } from '../audio/engine'
 import { HELP } from './help'
 import { PhysicsModal } from './PhysicsModal'
+import { ManufacturingTipsModal } from './ManufacturingTipsModal'
 import { DEFAULT_CONFIG } from '../state/store'
 import { listPresets as presetsList, savePreset, loadPreset, deletePreset } from '../state/presets'
 import { generateShareUrl, copyToClipboard } from '../state/share'
@@ -1057,6 +1058,7 @@ function ManufacturingTab({
   const [micError, setMicError] = useState<string | null>(null)
   const [stlExported, setStlExported] = useState(false)
   const [cordHoleMm, setCordHoleMm] = useState('2.0')
+  const [tipsOpen, setTipsOpen] = useState(false)
 
   const trackerRef = useRef<AudioPitchTracker | null>(null)
 
@@ -1281,6 +1283,17 @@ function ManufacturingTab({
 
   return (
     <>
+      <div className="mfg-tips-bar">
+        <button
+          className="mfg-tips-btn"
+          onClick={() => setTipsOpen(true)}
+          title="Manufacturing tips: extruded vs cold-drawn tubing, wall thickness, and workshop golden rule"
+        >
+          🛠️ Manufacturing & Workshop Tips
+        </button>
+      </div>
+      {tipsOpen && <ManufacturingTipsModal onClose={() => setTipsOpen(false)} />}
+
       {/* ────────────────── Section 1: Overview ────────────────── */}
       <Section id="mfgOverview" title="Overview" open={open} toggle={toggle}>
         <div className="mfg-container">
