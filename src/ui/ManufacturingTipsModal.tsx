@@ -41,7 +41,7 @@ export function ManufacturingTipsModal({ onClose }: { onClose: () => void }) {
         <div className="modal-body">
 
           <Callout title="🌟 The Golden Rule of Chime Building" type="gold">
-            <b>Always cut your first test tube 3 to 5 mm longer than calculated!</b>
+            <b>Always cut your first test tube 10 mm longer than calculated!</b>
             <p style={{ margin: '4px 0 0' }}>
               You can easily shorten a tube by filing, sanding, or fine-cutting to raise its pitch, but
               you cannot make a short tube longer. Cut one tube slightly long, hang it by a thread at 22.4%,
