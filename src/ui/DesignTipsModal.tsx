@@ -85,7 +85,7 @@ export function DesignTipsModal({ onClose }: { onClose: () => void }) {
             </p>
           </Section>
 
-          <Section title="2. Alloy Selection: Aluminium & Brass">
+          <Section title="2. Material & Alloy Selection: Aluminium, Brass & Copper">
             <p>
               <b>Aluminium — EN AW-6060-T66 (AlMgSi0.5):</b> The gold standard alloy for wind chimes. Precipitation hardening (Mg₂Si precipitates)
               pins crystal dislocations, giving an outstanding quality factor (Q ≈ 3000–3500) and long singing sustain (6–10 s).
@@ -129,6 +129,53 @@ export function DesignTipsModal({ onClose }: { onClose: () => void }) {
             <p style={{ fontSize: '11px', color: '#8892a6', margin: '4px 0 0' }}>
               💡 <b>Brass rule of thumb:</b> Always choose <b>CuZn37 (Ms63) ziehhart</b> for musical chimes. Because sound travels slower in brass (c ≈ 3480 m/s vs 5055 m/s in Al), brass tubes are ~17% shorter but over 3× heavier for the exact same pitch.
             </p>
+
+            <h4 style={{ color: '#b87333', margin: '18px 0 6px', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+              🪈 Copper Plumbing Pipes: EN 1057 (Cu-DHP) / ASTM B88
+            </h4>
+            <p>
+              Standard copper water and heating pipes are among the most accessible and musical materials for DIY chimes. They produce a <b>warm, deep, mellow bell tone</b> that softens piercing high overtones in favor of a soothing fundamental resonance (Q ≈ 1800, ~3–6 s sustain).
+            </p>
+            <p>
+              Because the bar wave speed in copper is lower (c ≈ 3615 m/s vs. 5055 m/s in aluminium), copper pipes ring noticeably lower in pitch for the same length — meaning tubes are <b>~20–25% shorter</b> for the exact same musical note.
+            </p>
+            <table className="pm-table" style={{ margin: '8px 0 10px' }}>
+              <thead>
+                <tr style={{ borderBottom: '1px solid #2a3242', color: '#b87333', textAlign: 'left' }}>
+                  <th style={{ padding: '6px 8px' }}>Norm & Temper</th>
+                  <th style={{ padding: '6px 8px' }}>Format / State</th>
+                  <th style={{ padding: '6px 8px' }}>Sustain (Q-Factor)</th>
+                  <th style={{ padding: '6px 8px' }}>Acoustic Performance</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><b>EN 1057 R290</b><br/><span style={{ fontSize: '11px', color: '#8892a6' }}>Hard-drawn (US Type L / M)</span></td>
+                  <td>Straight lengths (Stangenware, 1–2.5 m)</td>
+                  <td><b>Q ≈ 1800</b> (~3–6 s)</td>
+                  <td><b>🏆 Highly Recommended.</b> Work-hardened during drawing. Rings with a clear, resonant, organ-like sustain.</td>
+                </tr>
+                <tr>
+                  <td><b>EN 1057 R250</b><br/><span style={{ fontSize: '11px', color: '#8892a6' }}>Half-hard</span></td>
+                  <td>Straight lengths</td>
+                  <td><b>Q ≈ 1200–1400</b> (~2–4 s)</td>
+                  <td><b>Good.</b> Decent chime ring, slightly faster overtone decay than R290.</td>
+                </tr>
+                <tr>
+                  <td><b>EN 1057 R220</b><br/><span style={{ fontSize: '11px', color: '#8892a6' }}>Soft / Annealed</span></td>
+                  <td>Coiled rolls (Ringe / Coils)</td>
+                  <td><b>Q &lt; 300</b> (&lt; 0.5 s)</td>
+                  <td><b>❌ Unusable.</b> Heat-annealed soft copper has extreme dislocation damping — strikes result in a dull, dead wooden thud.</td>
+                </tr>
+              </tbody>
+            </table>
+            <Callout title="🔍 Hardware Store Shopping & Building Tips" type="gold">
+              <b>Identifying Hard Pipe:</b> Hardware store listings often show specs like <i>&quot;Zulässiger Betriebsdruck 36 bar, Betriebstemperatur 100 °C&quot;</i>. While pressure ratings are irrelevant for chimes, they confirm seamless industrial Cu-DHP tubing. Make sure the delivery form is <b>&quot;Stange&quot; (straight rigid length)</b>, which guarantees hard R290 temper.<br/>
+              <b>Recommended Diameters:</b> <b>22 × 1.0 mm</b> (or 3/4&quot; Type L) is the sweet spot for chime volume and rich resonance. <b>28 × 1.0 mm</b> (or 1&quot;) produces deep gong-like bass notes. <b>15 × 1.0 mm</b> (1/2&quot;) is delicate and quiet.<br/>
+              <b>Striker Choice:</b> Copper is softer than hardened alloys (Mohs ~3). Always use a <b>dense hardwood striker</b> (oak, beech, maple) or high-density plastic (acrylic, POM, PETG). Never use metal, which will dent the pipe and produce harsh click artifacts.<br/>
+              <b>Cutting & Deburring:</b> Standard rotary pipe cutters work easily on copper, but they create a pronounced inner rim. Always deburr or countersink the inner lip to preserve pure acoustic resonance.<br/>
+              <b>Patina:</b> Outdoors, copper slowly oxidizes to an earthy brown and eventually develops a turquoise verdigris patina (copper carbonate). This microscopic layer does <b>not</b> harm acoustic sustain.
+            </Callout>
           </Section>
 
         </div>

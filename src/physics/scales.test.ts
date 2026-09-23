@@ -22,6 +22,15 @@ describe('scaleFrequencies', () => {
     expect(notes[6]).toBe('D6')
   })
 
+  it('shifts octave up and down with octaveOffset', () => {
+    const s = SCALES.find((x) => x.id === 'pentMajor')!
+    const down = scaleFrequencies(s, 5, 'C', -1)
+    expect(down.map((n) => n.note)).toEqual(['C4', 'D4', 'E4', 'G4', 'A4'])
+    const up = scaleFrequencies(s, 5, 'C', 1)
+    expect(up.map((n) => n.note)).toEqual(['C6', 'D6', 'E6', 'G6', 'A6'])
+    expect(up[0].freq).toBeCloseTo(down[0].freq * 4, 3)
+  })
+
   it('frequencies match the equal-tempered note names (A4=440)', () => {
     const s = SCALES.find((x) => x.id === 'pentMinor')!
     const out = scaleFrequencies(s, 5, 'A')

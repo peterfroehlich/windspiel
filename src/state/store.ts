@@ -35,6 +35,7 @@ export interface ChimeConfig {
   tuningMode: 'scale' | 'manual'
   scaleId: string
   rootNote: string              // overrides scale's default root ('' = use default)
+  octaveOffset?: number         // octave shift relative to scale's base octave (default: 0)
   manualNotes: string[]
   suspensionRadius_mm: number
   suspensionPoint: number       // 0..0.5 of length from top
@@ -77,6 +78,7 @@ export const DEFAULT_CONFIG: ChimeConfig = {
   tuningMode: 'scale',
   scaleId: 'pentMajor',
   rootNote: 'C',
+  octaveOffset: 0,
   manualNotes: ['C5', 'D5', 'E5', 'G5', 'A5', 'C6'],
   suspensionRadius_mm: 55,
   suspensionPoint: 0.224,
@@ -316,7 +318,7 @@ function computeTubes(c: ChimeConfig): TubeConfig[] {
     }
   } else {
     const scale = SCALES.find(s => s.id === c.scaleId) ?? SCALES[0]
-    const notes = scaleFrequencies(scale, c.tubeCount, c.rootNote || undefined)
+    const notes = scaleFrequencies(scale, c.tubeCount, c.rootNote || undefined, c.octaveOffset ?? 0)
     for (let i = 0; i < c.tubeCount; i++) {
       const g = tubeGeometry(c, i)
       const speedFactor = c.materialSpeedFactors?.[g.material] ?? 1.0

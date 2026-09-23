@@ -40,11 +40,12 @@ const NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B']
 
 export const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B']
 
-/** Scale degrees, transposed to the given root (default: preset root). */
+/** Scale degrees, transposed to the given root (default: preset root), with optional octave offset. */
 export function scaleFrequencies(
   scale: ScalePreset,
   count: number,
   rootOverride?: string,
+  octaveOffset: number = 0,
 ): { freq: number; note: string }[] {
   const rootName = rootOverride ?? scale.root
   const rootSemi = NAMES.indexOf(rootName)
@@ -54,12 +55,13 @@ export function scaleFrequencies(
   const presetRootSemi = NAMES.indexOf(scale.root)
   const transpose = rootSemi - presetRootSemi
   const out: { freq: number; note: string }[] = []
+  const baseOctave = scale.octave + octaveOffset
   for (let i = 0; i < count; i++) {
     const st = scale.semitones[i % scale.semitones.length] + 12 * Math.floor(i / scale.semitones.length)
-    const midi = 12 * (scale.octave + 1) + presetRootSemi + transpose + st
+    const midi = 12 * (baseOctave + 1) + presetRootSemi + transpose + st
     const freq = 440 * Math.pow(2, (midi - 69) / 12)
     const name = NAMES[((presetRootSemi + transpose + st) % 12 + 12) % 12] +
-      (scale.octave + Math.floor((presetRootSemi + transpose + st) / 12))
+      (baseOctave + Math.floor((presetRootSemi + transpose + st) / 12))
     out.push({ freq, note: name })
   }
   return out

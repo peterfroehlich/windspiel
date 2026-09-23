@@ -247,6 +247,43 @@ body { font-family: system-ui, sans-serif; color: #dfe3ea; }
   flex: 1; min-width: 0; background: #1a2130; color: #dfe3ea;
   border: 1px solid #2a3242; border-radius: 6px; padding: 4px 6px; font-size: 12px;
 }
+.octave-btn-group {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  flex: none;
+}
+.octave-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  background: #1a2130;
+  border: 1px solid #2a3242;
+  border-radius: 6px;
+  color: #aeb8cc;
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+.octave-btn:hover:not(:disabled) {
+  background: #2c3a56;
+  border-color: #6c8cff;
+  color: #ffffff;
+}
+.octave-btn:active:not(:disabled) {
+  transform: scale(0.92);
+  background: #36486e;
+}
+.octave-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+  border-color: #1f2634;
+}
 .slider input[type="range"] { flex: 1; min-width: 0; accent-color: #6c8cff; }
 .slider .val {
   flex: none; min-width: 52px; text-align: right;

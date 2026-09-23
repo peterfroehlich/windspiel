@@ -92,7 +92,7 @@ const NUMERIC_KEYS: (keyof ChimeConfig)[] = [
   'tubeCount', 'outerDiameter_mm', 'wallThickness_mm', 'suspensionRadius_mm',
   'suspensionPoint', 'strikerDiameter_mm', 'strikerHeight_mm', 'strikerDistanceToTube_mm',
   'strikerDrop_mm', 'windStrength', 'gustFrequency', 'sailMass_g', 'sailArea_cm2', 'sailDrop_mm', 'volume',
-  'plateRadius_mm', 'tubeDrop_mm',
+  'plateRadius_mm', 'tubeDrop_mm', 'octaveOffset',
 ]
 
 const BOOLEAN_KEYS: (keyof ChimeConfig)[] = [
@@ -163,6 +163,10 @@ export function decodeConfigFromBase64(encoded: string): Partial<ChimeConfig> | 
 
     if (result.tubeCount !== undefined) {
       result.tubeCount = Math.max(3, Math.min(12, Math.round(result.tubeCount)))
+    }
+
+    if (result.octaveOffset !== undefined) {
+      result.octaveOffset = Math.max(-4, Math.min(4, Math.round(result.octaveOffset)))
     }
 
     for (const key of BOOLEAN_KEYS) {

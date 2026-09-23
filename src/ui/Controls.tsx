@@ -189,6 +189,7 @@ function Select(props: {
   label: string; value: string; options: { id: string; label: string }[]
   onChange: (v: string) => void
   helpId?: string
+  children?: React.ReactNode
 }) {
   return (
     <div className="row">
@@ -199,6 +200,7 @@ function Select(props: {
           <option key={o.id} value={o.id}>{o.label}</option>
         ))}
       </select>
+      {props.children}
     </div>
   )
 }
@@ -561,7 +563,7 @@ export function Controls() {
                 type="button"
                 className="tab-tips-btn design-tips-btn"
                 onClick={() => setDesignTipsOpen(true)}
-                title="Chime design tips: tube mounting & string clearance, alloy selection, and sustain optimization"
+                title="Chime design tips: tube mounting & string clearance, material selection (aluminium, brass, copper), and sustain optimization"
               >
                 💡 Design Tips & Acoustic Guide
               </button>
@@ -713,6 +715,7 @@ function TuningSection() {
   const activeScale = SCALES.find((s) => s.id === config.scaleId) ?? SCALES[0]
   const scaleMood = activeScale.mood
   const rootNote = config.rootNote || activeScale.root
+  const effectiveOctave = activeScale.octave + (config.octaveOffset ?? 0)
   const [inspectTube, setInspectTube] = useState<number | null>(null)
   return (
     <>
@@ -752,8 +755,32 @@ function TuningSection() {
             options={SCALES.filter((s) => s.mood === scaleMood)}
             onChange={(v) => setConfig({ scaleId: v })} />
           <Select label="Root" value={rootNote} helpId="rootNote"
-            options={NOTE_NAMES.map((n) => ({ id: n, label: n }))}
-            onChange={(v) => setConfig({ rootNote: v })} />
+            options={NOTE_NAMES.map((n) => ({ id: n, label: `${n}${effectiveOctave}` }))}
+            onChange={(v) => setConfig({ rootNote: v })}
+          >
+            <div className="octave-btn-group">
+              <button
+                type="button"
+                className="octave-btn"
+                onClick={() => setConfig({ octaveOffset: (config.octaveOffset ?? 0) - 1 })}
+                disabled={effectiveOctave <= 2}
+                title={`Shift octave down (currently ${rootNote}${effectiveOctave} → ${rootNote}${effectiveOctave - 1})`}
+                aria-label="Shift octave down"
+              >
+                ▼
+              </button>
+              <button
+                type="button"
+                className="octave-btn"
+                onClick={() => setConfig({ octaveOffset: (config.octaveOffset ?? 0) + 1 })}
+                disabled={effectiveOctave >= 7}
+                title={`Shift octave up (currently ${rootNote}${effectiveOctave} → ${rootNote}${effectiveOctave + 1})`}
+                aria-label="Shift octave up"
+              >
+                ▲
+              </button>
+            </div>
+          </Select>
         </>
       )}
       <button className="btn" onClick={() => tubes.forEach((_, i) => setTimeout(() => previewTube(i), i * 450))}>

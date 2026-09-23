@@ -8,10 +8,11 @@ export const HELP: Record<string, string> = {
 
   material:
     'Tube material. Sound speed √(E/ρ) sets the frequency for a given length — ' +
-    'aluminum (5055 m/s) and bamboo (5077 m/s) need similar lengths; carbon fibre ' +
-    '(9186 m/s) needs much longer tubes for the same pitch. Damping Q controls ' +
-    'sustain: aluminum/stainless ring for many seconds, bamboo dies in under a second. ' +
-    'Density also determines how loud a strike is (heavier = slower response to the same impulse).',
+    'aluminum (5055 m/s) and bamboo (5077 m/s) need similar lengths; copper (3615 m/s) ' +
+    'and brass (3430 m/s) play lower (~20% shorter tubes for the same pitch); ' +
+    'carbon fibre (9186 m/s) needs much longer tubes. Damping Q controls ' +
+    'sustain: aluminum/stainless ring for many seconds, copper/brass offer a warm, singing bell tone, ' +
+    'bamboo dies in under a second. Density also determines loudness.',
 
   outerDiameter:
     'Outer tube diameter. f₀ ∝ √(I/A) ∝ R (at fixed wall ratio), so bigger ' +
@@ -123,10 +124,10 @@ export const HELP: Record<string, string> = {
     'give that meditative koto feel; chords (maj7, dom9) sound lush but only when few tubes sound.',
 
   rootNote:
-    'Transposes the whole scale to another key. The transposition is relative to the ' +
-    'scale\'s native root, so the character is preserved — pentatonic minor rooted on F ' +
-    'is exactly pentatonic minor, just lower. Choose roots that put the longest tube ' +
-    'in a comfortable length range for your material.',
+    'Transposes the whole scale to another key. Use the arrow buttons on the right to shift ' +
+    'the entire scale up (▲) or down (▼) by octaves. The transposition is relative to the ' +
+    'scale\'s native root, preserving interval character. Choose roots and octaves that put ' +
+    'the longest tube in a comfortable length range for your material.',
 
   coupling:
     'Sympathetic vibration between tubes, carried through the suspension frame. ' +

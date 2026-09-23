@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { strikeWeights } from '../physics/modes'
+import { noteToFreq } from '../physics/tubes'
 import { useStore, tubeSpec, maxDrop_mm, optimalDrop_mm, equalLoudnessDrop_mm, minSailDrop_mm, optimalSailDrop_mm, tubeSuspension, tubeMountingPosition, effectiveStrikerDimensions } from './store'
 
 const st = () => useStore.getState()
@@ -92,6 +93,24 @@ describe('store: striker drop', () => {
     st().setConfig({ strikerDrop_mm: 300 })
     st().setConfig({ scaleId: 'minTriad', rootNote: 'C', tubeCount: 6 })
     expect(st().config.strikerDrop_mm).toBeLessThanOrEqual(maxDrop_mm(st().tubes))
+  })
+
+  it('octaveOffset shifts tube frequencies and lengths', () => {
+    st().setConfig({ scaleId: 'pentMajor', rootNote: 'C', octaveOffset: 0 })
+    const baseLengths = st().tubes.map((t) => t.length_mm)
+    const baseNotes = st().tubes.map((t) => t.note)
+    expect(baseNotes[0]).toBe('C5')
+
+    st().setConfig({ octaveOffset: 1 })
+    expect(st().tubes[0].note).toBe('C6')
+    expect(st().tubes[0].freq).toBeCloseTo(noteToFreq('C6'), 4)
+    // Higher octave = shorter tubes by factor of 1/√2 ≈ 0.707
+    expect(st().tubes[0].length_mm).toBeLessThan(baseLengths[0])
+
+    st().setConfig({ octaveOffset: -1 })
+    expect(st().tubes[0].note).toBe('C4')
+    expect(st().tubes[0].freq).toBeCloseTo(noteToFreq('C4'), 4)
+    expect(st().tubes[0].length_mm).toBeGreaterThan(baseLengths[0])
   })
 })
 
