@@ -110,6 +110,7 @@ describe('store: reset', () => {
     expect(c.advanced).toBe(false)
     expect(c.sailMass_g).toBe(30)
     expect(c.strikerMaterial).toBe('hardWood')
+    expect(c.tubeAlignment).toBe('centerStrike')
     expect(c.strikerDrop_mm).toBe(optimalDrop_mm(st().tubes))
   })
 
@@ -306,6 +307,17 @@ describe('store: tubeMountingPosition', () => {
     // Longest tube starts at exactly tubeDrop_mm
     const minTop = Math.min(...tubes.map((_, i) => tubeMountingPosition(config, tubes, i).top_mm))
     expect(minTop).toBeCloseTo(30, 5)
+  })
+
+  it('default alignment: uses center strike alignment by default', () => {
+    const { config, tubes } = st()
+    expect(config.tubeAlignment).toBe('centerStrike')
+    const maxL = Math.max(...tubes.map((t) => t.length_mm))
+    const expectedCenter = config.tubeDrop_mm + maxL / 2
+    tubes.forEach((_, i) => {
+      const pos = tubeMountingPosition(config, tubes, i)
+      expect(pos.center_mm).toBeCloseTo(expectedCenter, 5)
+    })
   })
 })
 

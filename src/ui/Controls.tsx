@@ -213,9 +213,9 @@ type MainTab = 'simulation' | 'design' | 'manufacturing'
 type SectionId =
   | 'wind'
   | 'optics'
+  | 'tuning'
   | 'tubes'
   | 'mounting'
-  | 'tuning'
   | 'striker'
   | 'mfgOverview'
   | 'mfgTuning'
@@ -355,8 +355,8 @@ export function Controls() {
   const [open, setOpen] = useState<Record<SectionId, boolean>>({
     wind: true,
     optics: true,
-    tubes: true,
     tuning: true,
+    tubes: true,
     striker: true,
     mounting: true,
     mfgOverview: true,
@@ -566,11 +566,11 @@ export function Controls() {
                 💡 Design Tips & Acoustic Guide
               </button>
             </div>
-            <Section id="tubes" title="Tubes" open={open} toggle={toggle}>
-              <TubesSection />
-            </Section>
             <Section id="tuning" title="Tuning" open={open} toggle={toggle}>
               <TuningSection />
+            </Section>
+            <Section id="tubes" title="Tubes" open={open} toggle={toggle}>
+              <TubesSection />
             </Section>
             <Section id="striker" title="Striker" open={open} toggle={toggle}>
               <StrikerSection />
@@ -596,8 +596,6 @@ function TubesSection() {
   const { config, tubes, setConfig, setTubeOverride } = useStore()
   return (
     <>
-      <Slider label="Tubes" min={3} max={12} step={1} helpId="tubeCount"
-        value={config.tubeCount} onChange={(v) => setConfig({ tubeCount: v })} />
       <Select label="Material" value={config.material} helpId="material"
         options={Object.values(MATERIALS)}
         onChange={(v) => setConfig({ material: v })} />
@@ -718,6 +716,8 @@ function TuningSection() {
   const [inspectTube, setInspectTube] = useState<number | null>(null)
   return (
     <>
+      <Slider label="Tubes" min={3} max={12} step={1} helpId="tubeCount"
+        value={config.tubeCount} onChange={(v) => setConfig({ tubeCount: v })} />
       <Select label="Mode" value={config.tuningMode} helpId="tuningMode"
         options={[{ id: 'scale', label: 'Scale preset' }, { id: 'manual', label: 'Manual notes' }]}
         onChange={(v) => {
@@ -1024,9 +1024,9 @@ function OpticsSection() {
 }
 
 const TUBE_ALIGNMENT_OPTIONS: { id: TubeAlignment; label: string }[] = [
+  { id: 'centerStrike', label: 'All aligned by center strike' },
   { id: 'top', label: 'All starting at the same offset' },
   { id: 'suspension', label: 'All aligned by suspension point' },
-  { id: 'centerStrike', label: 'All aligned by center strike' },
 ]
 
 function MountingSection() {
@@ -1045,7 +1045,7 @@ function MountingSection() {
       />
       <Select
         label="Alignment"
-        value={config.tubeAlignment ?? 'top'}
+        value={config.tubeAlignment ?? 'centerStrike'}
         helpId="tubeAlignment"
         options={TUBE_ALIGNMENT_OPTIONS}
         onChange={(v) => setConfig({ tubeAlignment: v as TubeAlignment })}

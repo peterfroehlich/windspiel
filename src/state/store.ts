@@ -93,7 +93,7 @@ export const DEFAULT_CONFIG: ChimeConfig = {
   plateRadius_mm: 90,
   plateColor: '#3a2f24',
   tubeDrop_mm: 30,
-  tubeAlignment: 'top',
+  tubeAlignment: 'centerStrike',
   sailType: 'rectangle',
   sailColor: '#8b3a3a',
   gustFrequency: 0.15,
@@ -252,7 +252,7 @@ export function tubeMountingPosition(
   tubes: TubeConfig[],
   index: number
 ): TubeMountingPosition {
-  const alignment = config.tubeAlignment ?? 'top'
+  const alignment = config.tubeAlignment ?? 'centerStrike'
   const drop = config.tubeDrop_mm
   const tube = tubes[index]
   const L = tube ? tube.length_mm : 300
@@ -275,27 +275,27 @@ export function tubeMountingPosition(
     }
   }
 
-  if (alignment === 'centerStrike') {
-    // All tubes aligned by center strike:
-    // Tube midpoints share the same elevation below the plate.
-    // Longest tube (largest L / 2) starts at drop below the plate.
-    const maxL = tubes.length ? Math.max(...tubes.map((t) => t.length_mm)) : L
-    const commonCenter_mm = drop + maxL / 2
-    const top_mm = commonCenter_mm - L / 2
+  if (alignment === 'top') {
+    // All starting at the same offset
+    const top_mm = drop
     return {
       top_mm,
       susp_mm: top_mm + s,
-      center_mm: commonCenter_mm,
+      center_mm: top_mm + L / 2,
       bottom_mm: top_mm + L,
     }
   }
 
-  // Default: 'top' - all starting at the same offset
-  const top_mm = drop
+  // Default: 'centerStrike' - all aligned by center strike:
+  // Tube midpoints share the same elevation below the plate.
+  // Longest tube (largest L / 2) starts at drop below the plate.
+  const maxL = tubes.length ? Math.max(...tubes.map((t) => t.length_mm)) : L
+  const commonCenter_mm = drop + maxL / 2
+  const top_mm = commonCenter_mm - L / 2
   return {
     top_mm,
     susp_mm: top_mm + s,
-    center_mm: top_mm + L / 2,
+    center_mm: commonCenter_mm,
     bottom_mm: top_mm + L,
   }
 }
