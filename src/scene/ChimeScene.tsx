@@ -2,7 +2,7 @@ import { useRef, useMemo, useEffect } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { OrbitControls, Environment, ContactShadows } from '@react-three/drei'
 import * as THREE from 'three'
-import { useStore, tubeSpec, tubeGeometry, tubeSuspension, tubeMountingPosition, effectiveStrikerDimensions } from '../state/store'
+import { useStore, tubeSpec, tubeGeometry, tubeSuspension, tubeMountingPosition, effectiveStrikerDimensions, optimalSailDrop_mm } from '../state/store'
 import { MATERIALS, STRIKER_MATERIALS } from '../physics/materials'
 import { WindSim } from '../physics/wind'
 import { audio } from '../audio/engine'
@@ -238,12 +238,12 @@ function Sail({ dropY }: { dropY: number }) {
     }
   })
 
-  // The wind catcher hangs on its own string from the striker and must clear
-  // the lowest tube bottom end — never sit beside/inside the tube forest.
-  const maxBottom = tubes.length
-    ? Math.max(...tubes.map((_, i) => tubeMountingPosition(config, tubes, i).bottom_mm)) / 1000
-    : 0.5
-  const y = -(maxBottom + 0.05 + halfH)   // lowest tube end + 5cm clearance + half sail height
+  // The wind catcher hangs on its own string (or rigid rod) from the striker
+  const strikerDims = effectiveStrikerDimensions(config, tubes)
+  const strikerY = -dropY - config.strikerDrop_mm / 1000
+  const yStrikerBottom = strikerY - strikerDims.height_mm / 2000
+  const sailDrop_m = (config.sailDrop_mm ?? optimalSailDrop_mm(config, tubes)) / 1000
+  const y = yStrikerBottom - sailDrop_m - halfH
   const geo = useMemo(() => {
     const g = new THREE.BufferGeometry()
     g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(6), 3))
@@ -333,12 +333,9 @@ function Simulator() {
     const dt = Math.min(0.05, (now - last.current) / 1000)
     last.current = now
 
-    // sail length = distance striker → sail board (must clear lowest tube end)
+    // sail length = distance striker → sail board
     const strikerY = (config.tubeDrop_mm + config.strikerDrop_mm) / 1000
-    const maxBottom = tubes.length
-      ? Math.max(...tubes.map((_, i) => tubeMountingPosition(config, tubes, i).bottom_mm)) / 1000
-      : 0.5
-    const sailLen = (maxBottom + 0.11) - strikerY
+    const sailDrop_m = (config.sailDrop_mm ?? optimalSailDrop_mm(config, tubes)) / 1000
     const strikerDims = effectiveStrikerDimensions(config, tubes)
     windSim.setGeometry(
       config.tubeCount,
@@ -346,7 +343,7 @@ function Simulator() {
       config.outerDiameter_mm / 2000,
       strikerDims.diameter_mm / 2000,
       strikerY,
-      Math.max(0.1, sailLen),
+      Math.max(0.08, sailDrop_m),
       config.sailMass_g,
       config.sailArea_cm2 ?? 80
     )

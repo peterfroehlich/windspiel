@@ -135,6 +135,68 @@ export function ManufacturingTipsModal({ onClose }: { onClose: () => void }) {
             </ul>
           </Section>
 
+          <Section title="4. Sail Dropper: Rigid Lever Rod vs. Flexible Cord">
+            <Callout title="🚀 Workshop Recommendation: Use a Wind-Inert Rigid Rod!" type="gold">
+              <b>Replace the lower cord between striker and sail with a 2.0–2.5 mm rigid rod.</b>
+              <p style={{ margin: '4px 0 0' }}>
+                While budget commercial chimes hang the sail on a floppy string, high-end architectural chimes use a thin,
+                stiff rod. Because the rod profile is so narrow (Ø 2 mm), it has near-zero aerodynamic drag (it is &quot;wind-inert&quot;),
+                allowing clean undisturbed wind to hit the sail while providing major mechanical advantages.
+              </p>
+            </Callout>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', margin: '12px 0' }}>
+              <div style={{ background: '#141a26', border: '1px solid #2a3242', borderRadius: '8px', padding: '12px' }}>
+                <div style={{ fontWeight: 700, color: '#f87171', marginBottom: '6px', fontSize: '13px' }}>
+                  ⚠️ Flexible Cord Problems
+                </div>
+                <ul className="pm-list" style={{ margin: 0, paddingLeft: '16px', fontSize: '12px', lineHeight: 1.5, color: '#aeb8cc' }}>
+                  <li>
+                    <b>The &quot;Death Wrap&quot;:</b> In storm gusts, the sail whips upward and wraps around the tubes, permanently disabling the chime until manually untangled.
+                  </li>
+                  <li>
+                    <b>Kite Planing:</b> Strong winds push the sail horizontal like a kite. It planes edge-on, dropping drag to zero and silencing the chime during the best breezes.
+                  </li>
+                  <li>
+                    <b>Slack Impulse Loss:</b> Cord slack and elasticity absorb sudden wind impulses instead of driving the striker.
+                  </li>
+                </ul>
+              </div>
+
+              <div style={{ background: '#141a26', border: '1px solid #2a3242', borderRadius: '8px', padding: '12px' }}>
+                <div style={{ fontWeight: 700, color: '#34d399', marginBottom: '6px', fontSize: '13px' }}>
+                  ✅ Rigid Lever Rod Advantages
+                </div>
+                <ul className="pm-list" style={{ margin: 0, paddingLeft: '16px', fontSize: '12px', lineHeight: 1.5, color: '#aeb8cc' }}>
+                  <li>
+                    <b>100% Anti-Tangle:</b> Geometrically impossible for the sail to flip over or wrap around the tubes, even in 15 m/s storms.
+                  </li>
+                  <li>
+                    <b>Instantaneous Torque (τ = F·L):</b> Gusts on the sail instantly transmit as powerful lateral shear to the striker with zero impulse damping.
+                  </li>
+                  <li>
+                    <b>Keeps Sail Vertical:</b> Acts as a pendulum keel, keeping the full surface area perpendicular to the airflow in all wind speeds.
+                  </li>
+                </ul>
+              </div>
+            </div>
+
+            <h4 style={{ color: '#6c8cff', margin: '14px 0 6px', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+              Recommended Workshop Materials & Assembly
+            </h4>
+            <ul className="pm-list">
+              <li>
+                <b>Stainless Steel TIG Wire (1.4316 / 316L):</b> 2.0 or 2.4 mm diameter. Inexpensive, springy, laser-straight, and 100% weatherproof. Bicycle spokes (2.0 mm stainless) also work wonderfully for medium chimes.
+              </li>
+              <li>
+                <b>Pultruded Carbon Fiber Rod (CFK):</b> 2.0 mm diameter. Extremely lightweight, rigid, and pitch-black aesthetics.
+              </li>
+              <li>
+                <b>Mounting:</b> Keep flexible braided cord from the top plate to the striker (allowing 360° free swing). Drill a 2.0–2.5 mm blind hole in the striker underside, press-fit or epoxy the rod, and secure the sail at the bottom with a set-screw collar or silicone stop ring.
+              </li>
+            </ul>
+          </Section>
+
         </div>
       </div>
     </div>,

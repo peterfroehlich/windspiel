@@ -1,7 +1,7 @@
 import { useState, useRef, useLayoutEffect, useEffect } from 'react'
 import type { ChangeEvent } from 'react'
 import { createPortal } from 'react-dom'
-import { useStore, tubeSpec, maxDrop_mm, optimalDrop_mm, equalLoudnessDrop_mm, tubeGeometry, tubeSuspension, tubeMountingPosition, effectiveStrikerDimensions } from '../state/store'
+import { useStore, tubeSpec, maxDrop_mm, optimalDrop_mm, equalLoudnessDrop_mm, minSailDrop_mm, optimalSailDrop_mm, tubeGeometry, tubeSuspension, tubeMountingPosition, effectiveStrikerDimensions } from '../state/store'
 import type { TubeAlignment } from '../state/store'
 import { MATERIALS, STRIKER_MATERIALS, STRIKER_FORMS } from '../physics/materials'
 import { SCALES, MOODS, NOTE_NAMES } from '../physics/scales'
@@ -572,7 +572,7 @@ export function Controls() {
             <Section id="tubes" title="Tubes" open={open} toggle={toggle}>
               <TubesSection />
             </Section>
-            <Section id="striker" title="Striker" open={open} toggle={toggle}>
+            <Section id="striker" title="Striker and Sail" open={open} toggle={toggle}>
               <StrikerSection />
             </Section>
             <Section id="mounting" title="Mounting" open={open} toggle={toggle}>
@@ -930,6 +930,60 @@ function StrikerSection() {
         <span className="legend-item"><i className="dot green" /> best tone (center-strike)</span>
         <span className="legend-item"><i className="dot amber" /> equal loudness</span>
       </div>
+
+      <div style={{ margin: '14px 0 10px', borderTop: '1px solid #2a3242' }} />
+      <div style={{ fontSize: '11px', fontWeight: 700, color: '#6c8cff', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>
+        Wind Sail & Dropper
+      </div>
+
+      {(() => {
+        const optSailDrop = optimalSailDrop_mm(config, tubes)
+        const minSailDrop = minSailDrop_mm(config, tubes)
+        const currentSailDrop = config.sailDrop_mm ?? optSailDrop
+        const optSailMass = Math.max(10, Math.min(180, Math.round(current * 0.6)))
+        const gustSailMass = Math.max(15, Math.min(195, Math.round(current * 0.85)))
+        return (
+          <>
+            <Slider
+              label="Sail drop"
+              min={Math.max(50, Math.round(minSailDrop * 0.4))}
+              max={Math.max(900, Math.round(optSailDrop * 1.6))}
+              step={5}
+              fmt={(v) => v + ' mm'}
+              helpId="sailDrop"
+              value={currentSailDrop}
+              onChange={(v) => setConfig({ sailDrop_mm: v })}
+              marker={optSailDrop}
+              markerLabel="◎ optimal whip ratio (~1.8× upper cord, detuned)"
+              marker2={minSailDrop}
+              marker2Label="◎ minimum tube clearance (50 mm below longest tube)"
+            />
+            <div className="marker-legend">
+              <span className="legend-item"><i className="dot green" /> optimal whip (~1.8×)</span>
+              <span className="legend-item"><i className="dot amber" /> tube clearance (-50 mm)</span>
+            </div>
+
+            <Slider
+              label="Sail weight"
+              min={5}
+              max={200}
+              step={1}
+              fmt={(v) => v + ' g'}
+              helpId="sailWeight"
+              value={config.sailMass_g}
+              onChange={(v) => setConfig({ sailMass_g: v })}
+              marker={optSailMass}
+              markerLabel="◎ optimal whip balance (~60% of striker mass)"
+              marker2={gustSailMass}
+              marker2Label="◎ gust-resistant / heavy wind (~85% of striker mass)"
+            />
+            <div className="marker-legend">
+              <span className="legend-item"><i className="dot green" /> optimal whip (~60% striker)</span>
+              <span className="legend-item"><i className="dot amber" /> gust resistant (~85%)</span>
+            </div>
+          </>
+        )
+      })()}
     </>
   )
 }

@@ -137,6 +137,19 @@ export const HELP: Record<string, string> = {
     'that energy, so its ring shortens slightly. Uses a Lorentzian coupled-mode ' +
     'model: κ = 0.5 / (1 + (Δf/γ)²). Air-borne coupling (~60 dB weaker) is not modeled.',
 
+  sailDrop:
+    'Dropper cord/rod length from the bottom of the striker down to the top of the sail. ' +
+    'Physics: As the lower stage of a double pendulum, optimal whip action occurs when ' +
+    'this length is ~1.5–2× the upper cord length (green marker), detuning the pendulum modes ' +
+    'and pumping kinetic energy into the striker. The sail must also clear the lowest tube end ' +
+    'by at least 50 mm (amber marker) to escape the dead turbulent aerodynamic wake.',
+
+  sailWeight:
+    'Mass of the wind-catcher board. For optimal double-pendulum whipping, the sail mass ' +
+    'should be ~60% of the striker mass (green marker). A sail that is too heavy drags the ' +
+    'striker like an anchor; a sail that is too light cannot overcome the striker\'s inertia ' +
+    'to produce crisp, audible strikes.',
+
   sailMass:
     'Mass of the wind catcher (for its fixed size, this is the board\'s areal ' +
     'density — a 10 g acrylic sheet vs a 200 g hardwood block). Wind force on the ' +

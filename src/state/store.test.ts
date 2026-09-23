@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { strikeWeights } from '../physics/modes'
-import { useStore, tubeSpec, maxDrop_mm, optimalDrop_mm, equalLoudnessDrop_mm, tubeSuspension, tubeMountingPosition, effectiveStrikerDimensions } from './store'
+import { useStore, tubeSpec, maxDrop_mm, optimalDrop_mm, equalLoudnessDrop_mm, minSailDrop_mm, optimalSailDrop_mm, tubeSuspension, tubeMountingPosition, effectiveStrikerDimensions } from './store'
 
 const st = () => useStore.getState()
 
@@ -141,6 +141,22 @@ describe('derived helpers', () => {
     }
     expect(spread(equalLoudnessDrop_mm(st().tubes, st().config.suspensionPoint) / 1000))
       .toBeLessThan(spread(optimalDrop_mm(st().tubes) / 1000))
+  })
+
+  it('minSailDrop clears the longest tube by 50 mm', () => {
+    const { config, tubes } = st()
+    const minDrop = minSailDrop_mm(config, tubes)
+    const strikerY = config.tubeDrop_mm + config.strikerDrop_mm
+    const maxBottom = Math.max(...tubes.map((_, i) => tubeMountingPosition(config, tubes, i).bottom_mm))
+    expect(minDrop).toBe(Math.max(80, Math.round(maxBottom - strikerY + 50)))
+  })
+
+  it('optimalSailDrop provides whip ratio ~1.8x and exceeds minimum clearance', () => {
+    const { config, tubes } = st()
+    const optDrop = optimalSailDrop_mm(config, tubes)
+    const minDrop = minSailDrop_mm(config, tubes)
+    expect(optDrop).toBeGreaterThanOrEqual(minDrop)
+    expect(st().config.sailDrop_mm).toBe(optDrop)
   })
 })
 

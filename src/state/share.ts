@@ -91,7 +91,7 @@ export function encodeConfigToBase64(config: Partial<ChimeConfig>): string {
 const NUMERIC_KEYS: (keyof ChimeConfig)[] = [
   'tubeCount', 'outerDiameter_mm', 'wallThickness_mm', 'suspensionRadius_mm',
   'suspensionPoint', 'strikerDiameter_mm', 'strikerHeight_mm', 'strikerDistanceToTube_mm',
-  'strikerDrop_mm', 'windStrength', 'gustFrequency', 'sailMass_g', 'sailArea_cm2', 'volume',
+  'strikerDrop_mm', 'windStrength', 'gustFrequency', 'sailMass_g', 'sailArea_cm2', 'sailDrop_mm', 'volume',
   'plateRadius_mm', 'tubeDrop_mm',
 ]
 

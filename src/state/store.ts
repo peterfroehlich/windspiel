@@ -49,6 +49,7 @@ export interface ChimeConfig {
   gustFrequency: number         // gusts per second
   sailMass_g: number            // wind-catcher mass (areal density of the board)
   sailArea_cm2?: number         // wind-catcher surface area in cm² (default: 80 cm²)
+  sailDrop_mm?: number          // dropper length from striker to sail (default: optimal whip ratio)
   volume: number
   // Optics: top plate + sail shape/color
   plateShape: string            // disc | ring | octagon | square
@@ -89,6 +90,7 @@ export const DEFAULT_CONFIG: ChimeConfig = {
   windStrength: 0.35,
   sailMass_g: 30,
   sailArea_cm2: 80,
+  sailDrop_mm: 500,    // replaced below: optimal whip ratio
   plateShape: 'disc',
   plateRadius_mm: 90,
   plateColor: '#3a2f24',
@@ -325,6 +327,25 @@ function computeTubes(c: ChimeConfig): TubeConfig[] {
   return out
 }
 
+/** Calculate minimum clearance drop for sail from striker (clearing lowest tube end by 50 mm) */
+export function minSailDrop_mm(config: ChimeConfig, tubes: TubeConfig[]): number {
+  if (!tubes.length) return 200
+  const strikerY = config.tubeDrop_mm + config.strikerDrop_mm
+  const maxBottom = Math.max(...tubes.map((_, i) => tubeMountingPosition(config, tubes, i).bottom_mm))
+  return Math.max(80, Math.round(maxBottom - strikerY + 50))
+}
+
+/** Optimal sail drop from striker: 1.8× upper pendulum length (top plate to striker),
+ *  guaranteeing double-pendulum frequency detuning (whip action) and tube clearance */
+export function optimalSailDrop_mm(config: ChimeConfig, tubes: TubeConfig[]): number {
+  const strikerY = config.tubeDrop_mm + config.strikerDrop_mm
+  const minClear = minSailDrop_mm(config, tubes)
+  const ratioDrop = Math.round(strikerY * 1.8)
+  return Math.max(minClear, ratioDrop)
+}
+
+DEFAULT_CONFIG.sailDrop_mm = optimalSailDrop_mm(DEFAULT_CONFIG, computeTubes(DEFAULT_CONFIG))
+
 interface State {
   config: ChimeConfig
   tubes: TubeConfig[]
@@ -371,6 +392,11 @@ export const useStore = create<State>((set) => ({
     if (config.strikerDrop_mm > maxDrop_mm(tubes)) {
       config.strikerDrop_mm = maxDrop_mm(tubes)
     }
+
+    const changingSailDrop = 'sailDrop_mm' in p
+    const sailOptBefore = optimalSailDrop_mm(s.config, s.tubes)
+    const wasAtSailOpt = s.config.sailDrop_mm !== undefined && Math.abs(s.config.sailDrop_mm - sailOptBefore) <= 2
+    if (!changingSailDrop && wasAtSailOpt) config.sailDrop_mm = optimalSailDrop_mm(config, tubes)
     return { config, tubes }
   }),
   setManualNote: (i, note) => set(s => {
@@ -385,6 +411,10 @@ export const useStore = create<State>((set) => ({
     if (config.strikerDrop_mm > maxDrop_mm(tubes)) {
       config.strikerDrop_mm = maxDrop_mm(tubes)
     }
+
+    const sailOptBefore = optimalSailDrop_mm(s.config, s.tubes)
+    const wasAtSailOpt = s.config.sailDrop_mm !== undefined && Math.abs(s.config.sailDrop_mm - sailOptBefore) <= 2
+    if (wasAtSailOpt) config.sailDrop_mm = optimalSailDrop_mm(config, tubes)
     return { config, tubes }
   }),
   setTubeOverride: (i, o) => set(s => {
