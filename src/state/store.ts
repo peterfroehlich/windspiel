@@ -363,13 +363,11 @@ interface State {
   flash: (i: number, vel?: number) => void
 }
 
-/** Max sensible striker drop: a bit below the shortest tube's bottom end. */
+/** Max sensible striker drop: allows reaching along the tubes down to 95% of the longest tube. */
 export function maxDrop_mm(tubes: TubeConfig[]): number {
   if (!tubes.length) return 150
-  const shortest = Math.min(...tubes.map(t => t.length_mm))
-  // the striker must sit above the shortest tube's lower end, otherwise that
-  // tube is unreachable — allow reaching its bottom 10% at most
-  return Math.max(20, Math.round(shortest * 0.9))
+  const longest = Math.max(...tubes.map(t => t.length_mm))
+  return Math.max(50, Math.round(longest * 0.95))
 }
 
 export const useStore = create<State>((set) => ({

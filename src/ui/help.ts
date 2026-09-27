@@ -88,8 +88,8 @@ export const HELP: Record<string, string> = {
     'the impact lands (ξ = drop / tube length) — the single biggest tone control after the ' +
     'tuning itself. The green marker shows the optimum: 50% of the longest tube, where the ' +
     'fundamental is at its antinode and the harsh 2.756×f₀ partial sits on a node (−112 dB). ' +
-    'High up the tube (small drop) = thin, overtone-heavy sound. The slider caps at 90% of ' +
-    'the shortest tube so every tube stays reachable.',
+    'High up the tube (small drop) = thin, overtone-heavy sound. The slider caps at 95% of ' +
+    'the longest tube so the full span of the chime is reachable.',
 
   windStrength:
     'Mean wind speed (0–100% ≈ 0–3.5 m/s at the sail). Drives the pendulum energy: below ' +

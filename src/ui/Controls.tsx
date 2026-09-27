@@ -129,11 +129,11 @@ function Slider(props: {
     return `${(pct * usable + thumb / 2).toFixed(1)}px`
   }
 
-  /** Snap the raw value to a nearby marker (within ~5% of the range) and
+  /** Snap the raw value to a nearby marker (within ~2.5% of the range, at most 8 units) and
    *  quantize to the slider step. */
   const snap = (raw: number): number => {
     const range = props.max - props.min
-    const tol = 0.05 * range
+    const tol = Math.max(props.step, Math.min(8, 0.025 * range))
     for (const m of [props.marker, props.marker2]) {
       if (m !== undefined && Math.abs(raw - m) <= tol) {
         // quantize the marker to the slider's own step grid
@@ -941,7 +941,7 @@ function StrikerSection() {
 
       <Slider
         label="Drop"
-        min={20}
+        min={10}
         max={maxDrop_mm(tubes)}
         step={1}
         fmt={(v) => v + ' mm'}

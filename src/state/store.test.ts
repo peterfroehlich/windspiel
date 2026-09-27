@@ -90,9 +90,10 @@ describe('store: striker drop', () => {
   })
 
   it('drop is clamped when tubes become too short to reach', () => {
-    st().setConfig({ strikerDrop_mm: 300 })
-    st().setConfig({ scaleId: 'minTriad', rootNote: 'C', tubeCount: 6 })
+    st().setConfig({ strikerDrop_mm: 400 })
+    st().setConfig({ octaveOffset: 2 })
     expect(st().config.strikerDrop_mm).toBeLessThanOrEqual(maxDrop_mm(st().tubes))
+    expect(st().config.strikerDrop_mm).toBe(maxDrop_mm(st().tubes))
   })
 
   it('octaveOffset shifts tube frequencies and lengths', () => {
@@ -148,8 +149,8 @@ describe('derived helpers', () => {
     expect(optimalDrop_mm(st().tubes)).toBe(Math.round(Math.max(...st().tubes.map((t) => t.length_mm)) * 0.5))
   })
 
-  it('maxDrop = 90% of shortest tube (every tube stays reachable)', () => {
-    expect(maxDrop_mm(st().tubes)).toBe(Math.round(Math.min(...st().tubes.map((t) => t.length_mm)) * 0.9))
+  it('maxDrop = 95% of longest tube (reaches full span of chime tubes)', () => {
+    expect(maxDrop_mm(st().tubes)).toBe(Math.round(Math.max(...st().tubes.map((t) => t.length_mm)) * 0.95))
   })
 
   it('equal-loudness drop has smaller fundamental spread than the optimal drop', () => {
