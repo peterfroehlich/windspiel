@@ -21,6 +21,7 @@ import { generateShareUrl, copyToClipboard } from '../state/share'
 import { estimateCut, freqToNote, calculateMaterialCalibration } from '../physics/tuning'
 import { AudioPitchTracker } from '../audio/pitchDetector'
 import { downloadStrikerSTL } from '../physics/stlExport'
+import { NotePicker } from './NotePicker'
 
 
 /** Config keys accepted on import (subset check against foreign JSON). */
@@ -717,6 +718,14 @@ function TuningSection() {
   const rootNote = config.rootNote || activeScale.root
   const effectiveOctave = activeScale.octave + (config.octaveOffset ?? 0)
   const [inspectTube, setInspectTube] = useState<number | null>(null)
+  const [activePickerIdx, setActivePickerIdx] = useState<number | null>(null)
+
+  useEffect(() => {
+    if (activePickerIdx !== null && activePickerIdx >= tubes.length) {
+      setActivePickerIdx(null)
+    }
+  }, [activePickerIdx, tubes.length])
+
   return (
     <>
       <Slider label="Tubes" min={3} max={12} step={1} helpId="tubeCount"
@@ -730,6 +739,7 @@ function TuningSection() {
               manualNotes: tubes.map((t) => t.note),
             })
           } else {
+            setActivePickerIdx(null)
             setConfig({ tuningMode: v as 'scale' | 'manual' })
           }
         }} />
@@ -788,27 +798,66 @@ function TuningSection() {
       </button>
       <div className="tube-list">
         {tubes.map((t, i) => (
-          <div key={i} className="tube-row" tabIndex={0}
-            onMouseEnter={() => setInspectTube(i)}
-            onMouseLeave={() => setInspectTube(null)}
-            onFocus={() => setInspectTube(i)}
-            onBlur={() => setInspectTube(null)}
-            onClick={() => previewTube(i)}
-            title="Click to strike — hover to see this tube's strike analysis">
-            <button className="mini" onClick={(e) => { e.stopPropagation(); previewTube(i) }}>♪</button>
-            {config.tuningMode === 'manual' ? (
-              <input
-                className="note-input"
-                value={config.manualNotes[i] ?? t.note}
-                onClick={(e) => e.stopPropagation()}
-                onChange={(e) => setManualNote(i, e.target.value)}
-                title="Enter note name (e.g. C5, F#4, Bb4)"
+          <div key={i} className="tube-row-wrap">
+            <div
+              className={`tube-row ${inspectTube === i ? 'active' : ''} ${activePickerIdx === i ? 'editing' : ''}`}
+              tabIndex={0}
+              onMouseEnter={() => setInspectTube(i)}
+              onMouseLeave={() => setInspectTube(null)}
+              onFocus={() => setInspectTube(i)}
+              onBlur={() => setInspectTube(null)}
+              onClick={() => previewTube(i)}
+              title="Click to strike — hover to see this tube's strike analysis"
+            >
+              <button
+                className="mini"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  previewTube(i)
+                }}
+              >
+                ♪
+              </button>
+              {config.tuningMode === 'manual' ? (
+                <button
+                  type="button"
+                  className={`note-picker-btn ${activePickerIdx === i ? 'active' : ''}`}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    setActivePickerIdx(activePickerIdx === i ? null : i)
+                  }}
+                  title="Click to open note picker"
+                  aria-expanded={activePickerIdx === i}
+                >
+                  <span className="note-picker-btn-val">{config.manualNotes[i] ?? t.note}</span>
+                  <span className="note-picker-btn-caret">{activePickerIdx === i ? '▴' : '▾'}</span>
+                </button>
+              ) : (
+                <span className="note">{t.note}</span>
+              )}
+              <span className="freq">{t.freq.toFixed(1)} Hz</span>
+              <span className="len">{t.length_mm.toFixed(0)} mm</span>
+            </div>
+
+            {config.tuningMode === 'manual' && activePickerIdx === i && (
+              <NotePicker
+                tubeIndex={i}
+                totalTubes={tubes.length}
+                currentNote={config.manualNotes[i] ?? t.note}
+                tubeFreq={t.freq}
+                tubeLength_mm={t.length_mm}
+                onSelectNote={(note) => {
+                  setManualNote(i, note)
+                  previewTube(i)
+                }}
+                onSelectTube={(idx) => {
+                  setActivePickerIdx(idx)
+                  previewTube(idx)
+                }}
+                onClose={() => setActivePickerIdx(null)}
+                onPlay={() => previewTube(i)}
               />
-            ) : (
-              <span className="note">{t.note}</span>
             )}
-            <span className="freq">{t.freq.toFixed(1)} Hz</span>
-            <span className="len">{t.length_mm.toFixed(0)} mm</span>
           </div>
         ))}
       </div>
