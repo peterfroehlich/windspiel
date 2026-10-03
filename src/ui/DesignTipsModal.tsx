@@ -51,29 +51,34 @@ export function DesignTipsModal({ onClose }: { onClose: () => void }) {
             </Callout>
 
             <p>
-              To isolate the tube acoustically, you must choose one of two proven mounting techniques:
+              To isolate the tube acoustically and stabilize the chime, choose one of three proven mounting techniques:
             </p>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', margin: '12px 0' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px', margin: '12px 0' }}>
               <div style={{ background: '#141a26', border: '1px solid #2a3242', borderRadius: '8px', padding: '12px' }}>
                 <div style={{ fontWeight: 700, color: '#6c8cff', marginBottom: '6px', fontSize: '13px' }}>
-                  Option A: Tube Spreader (Abstandshalter)
+                  Option A: Bridge / Spreader Bar
                 </div>
                 <p style={{ margin: 0, fontSize: '12px', lineHeight: 1.5, color: '#aeb8cc' }}>
-                  Place a small horizontal bar, disk, or spreader ring directly above each tube.
-                  The spreader must be <b>wider than the tube outer diameter</b>. The two cord legs exit the 22.4% node holes
-                  and angle outward in a V-shape to the spreader, clearing the tube rim by several millimeters without touching.
+                  A single line from the canopy splits at a horizontal spreader bar directly above each tube. The bar is <b>wider than the tube</b>, so cords run down and inward to the node holes without touching or damping the rim.
                 </p>
               </div>
 
               <div style={{ background: '#141a26', border: '1px solid #2a3242', borderRadius: '8px', padding: '12px' }}>
                 <div style={{ fontWeight: 700, color: '#a78bfa', marginBottom: '6px', fontSize: '13px' }}>
-                  Option B: Internal Running String (Innenführung)
+                  Option B: Center / Internal Bar
                 </div>
                 <p style={{ margin: 0, fontSize: '12px', lineHeight: 1.5, color: '#aeb8cc' }}>
-                  Run a single central cord down the <b>inside of the tube</b> from the canopy. At the 22.4% suspension node,
-                  the cord anchors to a cross-pin, horizontal stop knot, or threads through the node holes from inside to outside.
-                  Since the string is internal, zero cord ever touches the exterior vibrating body.
+                  A single line runs straight down <b>inside the tube</b>, anchoring to an internal cross-pin at the 22.4% node. Zero exterior cords exist on the vibrating body, guaranteeing 100% zero rim contact and sleek aesthetics.
+                </p>
+              </div>
+
+              <div style={{ background: '#141a26', border: '1px solid #2a3242', borderRadius: '8px', padding: '12px' }}>
+                <div style={{ fontWeight: 700, color: '#34d399', marginBottom: '6px', fontSize: '13px' }}>
+                  Option C: V-Style Triangulation
+                </div>
+                <p style={{ margin: 0, fontSize: '12px', lineHeight: 1.5, color: '#aeb8cc' }}>
+                  Two lines run from every tube up to separate spaced holes in the top canopy, forming a <b>distinct V shape</b>. Triangulation prevents torsional tube spin and stabilizes tube orientation in brisk winds.
                 </p>
               </div>
             </div>

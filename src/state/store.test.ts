@@ -357,4 +357,21 @@ describe('store: tubeMountingPosition', () => {
   })
 })
 
+describe('store: mountingStyle', () => {
+  it('defaults to bridge mounting style', () => {
+    expect(st().config.mountingStyle).toBe('bridge')
+  })
+
+  it('can be changed to center and v-style', () => {
+    st().setConfig({ mountingStyle: 'center' })
+    expect(st().config.mountingStyle).toBe('center')
+
+    st().setConfig({ mountingStyle: 'v-style' })
+    expect(st().config.mountingStyle).toBe('v-style')
+
+    st().setConfig({ mountingStyle: 'bridge' })
+    expect(st().config.mountingStyle).toBe('bridge')
+  })
+})
+
 

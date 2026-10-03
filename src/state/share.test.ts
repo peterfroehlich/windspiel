@@ -64,8 +64,17 @@ describe('share utility: config serialization, compression & backwards compatibi
     expect(parsed?.tubeCount).toBe(DEFAULT_CONFIG.tubeCount)
     expect(parsed?.material).toBe(DEFAULT_CONFIG.material)
     expect(parsed?.tubeAlignment).toBe(DEFAULT_CONFIG.tubeAlignment)
+    expect(parsed?.mountingStyle).toBe(DEFAULT_CONFIG.mountingStyle)
     expect(parsed?.strikerForm).toBe(DEFAULT_CONFIG.strikerForm)
     expect(parsed?.sailArea_cm2).toBe(DEFAULT_CONFIG.sailArea_cm2)
+  })
+
+  it('round-trips all mounting styles via compressed format', () => {
+    for (const style of ['bridge', 'center', 'v-style'] as const) {
+      const b64 = encodeConfigToBase64({ ...DEFAULT_CONFIG, mountingStyle: style })
+      const parsed = decodeConfigFromBase64(b64)
+      expect(parsed?.mountingStyle).toBe(style)
+    }
   })
 
   it('still decodes UNCOMPRESSED sharing URLs for backwards compatibility', () => {

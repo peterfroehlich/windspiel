@@ -183,6 +183,12 @@ export const HELP: Record<string, string> = {
     '"All aligned by suspension point" aligns all drill/suspension holes horizontally for uniform cord length; ' +
     '"All aligned by center strike" centers each tube at its midpoint so the striker hits every tube at its fundamental antinode.',
 
+  mountingStyle:
+    'Suspension mounting method for acoustic isolation: ' +
+    '"Bridge": A single line drops from the top plate, splits at a horizontal spreader bar wider than the tube, and runs together again to the tube node holes without rubbing the rim; ' +
+    '"Center": A single line runs inside the tube, attaching to an internal suspension cross-bar at the 22.4% node for a clean exterior; ' +
+    '"V-style": Two lines run from each tube up to separate holes on the top plate, creating a triangulated V shape that resists torsional spinning.',
+
   sailShape:
     'Shape of the wind catcher at the bottom. The physics only cares about its area ' +
     'and mass (set in the Wind section), so the shape is an aesthetic choice — but it ' +

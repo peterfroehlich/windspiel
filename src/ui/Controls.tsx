@@ -2,7 +2,7 @@ import { useState, useRef, useLayoutEffect, useEffect } from 'react'
 import type { ChangeEvent } from 'react'
 import { createPortal } from 'react-dom'
 import { useStore, tubeSpec, maxDrop_mm, optimalDrop_mm, equalLoudnessDrop_mm, minSailDrop_mm, optimalSailDrop_mm, tubeGeometry, tubeSuspension, tubeMountingPosition, effectiveStrikerDimensions } from '../state/store'
-import type { TubeAlignment } from '../state/store'
+import type { TubeAlignment, MountingStyle } from '../state/store'
 import { MATERIALS, STRIKER_MATERIALS, STRIKER_FORMS } from '../physics/materials'
 import { SCALES, MOODS, NOTE_NAMES } from '../physics/scales'
 import { tubeDecay } from '../physics/tubes'
@@ -1153,6 +1153,12 @@ function OpticsSection() {
   )
 }
 
+const MOUNTING_STYLE_OPTIONS: { id: MountingStyle; label: string }[] = [
+  { id: 'bridge', label: 'Bridge (Spreader Bar)' },
+  { id: 'center', label: 'Center (Internal Suspension Bar)' },
+  { id: 'v-style', label: 'V-Style (Triangulated Cords)' },
+]
+
 const TUBE_ALIGNMENT_OPTIONS: { id: TubeAlignment; label: string }[] = [
   { id: 'centerStrike', label: 'All aligned by center strike' },
   { id: 'top', label: 'All starting at the same offset' },
@@ -1161,8 +1167,37 @@ const TUBE_ALIGNMENT_OPTIONS: { id: TubeAlignment; label: string }[] = [
 
 function MountingSection() {
   const { config, setConfig } = useStore()
+  const currentStyle = config.mountingStyle ?? 'bridge'
+
   return (
     <>
+      <Select
+        label="Mounting style"
+        value={currentStyle}
+        helpId="mountingStyle"
+        options={MOUNTING_STYLE_OPTIONS}
+        onChange={(v) => setConfig({ mountingStyle: v as MountingStyle })}
+      />
+      <div style={{
+        fontSize: '11px',
+        color: '#94a3b8',
+        backgroundColor: '#171c26',
+        borderRadius: '6px',
+        padding: '8px 10px',
+        margin: '6px 0 12px',
+        lineHeight: 1.45,
+        border: '1px solid #283244'
+      }}>
+        {currentStyle === 'bridge' && (
+          <span><strong>Bridge:</strong> Single line from the top plate splits at a horizontal spreader bar and runs together again to the tube node holes, clearing the tube rim.</span>
+        )}
+        {currentStyle === 'center' && (
+          <span><strong>Center:</strong> Single line drops straight inside the hollow tube, anchored to an internal horizontal suspension cross-bar at the 22.4% node.</span>
+        )}
+        {currentStyle === 'v-style' && (
+          <span><strong>V-Style:</strong> Two lines from every tube run up to separate holes on the top plate, forming a V shape that stabilizes against twisting.</span>
+        )}
+      </div>
       <Slider
         label="Tube offset"
         min={0}

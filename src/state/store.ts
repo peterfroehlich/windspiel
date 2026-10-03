@@ -58,11 +58,13 @@ export interface ChimeConfig {
   plateColor: string
   tubeDrop_mm: number           // how far below the plate the tubes start
   tubeAlignment?: TubeAlignment // alignment: top offset | suspension point | center strike
+  mountingStyle?: MountingStyle // mounting style: bridge | center | v-style
   sailType: string              // rectangle | diamond | circle | teardrop | feather
   sailColor: string
 }
 
 export type TubeAlignment = 'top' | 'suspension' | 'centerStrike'
+export type MountingStyle = 'bridge' | 'center' | 'v-style'
 
 export const DEFAULT_CONFIG: ChimeConfig = {
   tubeCount: 6,
@@ -98,6 +100,7 @@ export const DEFAULT_CONFIG: ChimeConfig = {
   plateColor: '#3a2f24',
   tubeDrop_mm: 30,
   tubeAlignment: 'centerStrike',
+  mountingStyle: 'bridge',
   sailType: 'rectangle',
   sailColor: '#8b3a3a',
   gustFrequency: 0.15,

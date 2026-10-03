@@ -102,7 +102,7 @@ const BOOLEAN_KEYS: (keyof ChimeConfig)[] = [
 const STRING_KEYS: (keyof ChimeConfig)[] = [
   'material', 'tuningMode', 'scaleId', 'rootNote', 'strikerMaterial',
   'strikerForm', 'strikerMode', 'plateShape', 'plateColor', 'tubeAlignment',
-  'sailType', 'sailColor',
+  'mountingStyle', 'sailType', 'sailColor',
 ]
 
 /**

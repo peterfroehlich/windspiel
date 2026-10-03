@@ -65,6 +65,12 @@ function TubeMesh({ index }: { index: number }) {
     g.rotation.x = Math.cos(ph * 0.87) * amp * 0.8
   })
 
+  const style = config.mountingStyle ?? 'bridge'
+  const quatTangential = useMemo(() => {
+    const dir = new THREE.Vector3(-Math.sin(angle), 0, Math.cos(angle)).normalize()
+    return new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir)
+  }, [angle])
+
   return (
     <group ref={pivotRef} position={[x, -suspY, z]}>
       <mesh position={[0, s - L / 2, 0]} castShadow
@@ -90,9 +96,53 @@ function TubeMesh({ index }: { index: number }) {
         <meshStandardMaterial color={mat.color} metalness={mat.metalness} roughness={mat.roughness} side={THREE.DoubleSide} />
       )}
       </mesh>
+
+      {/* Internal suspension bar for 'center' mounting style */}
+      {style === 'center' ? (
+        <group quaternion={quatTangential}>
+          {/* Internal cross-bar */}
+          <mesh>
+            <cylinderGeometry args={[0.0014, 0.0014, Math.max(0.005, (radius - 0.0006) * 2), 16]} />
+            <meshStandardMaterial color="#c2cad6" roughness={0.25} metalness={0.85} />
+          </mesh>
+          {/* Central string attachment loop/knot */}
+          <mesh position={[0, 0, 0]}>
+            <sphereGeometry args={[0.0026, 12, 12]} />
+            <meshStandardMaterial color="#e2e8f0" roughness={0.4} metalness={0.1} />
+          </mesh>
+          {/* External pin tips marking the drill holes */}
+          <mesh position={[0, radius, 0]}>
+            <cylinderGeometry args={[0.0016, 0.0016, 0.001, 12]} />
+            <meshStandardMaterial color="#88929e" roughness={0.3} metalness={0.8} />
+          </mesh>
+          <mesh position={[0, -radius, 0]}>
+            <cylinderGeometry args={[0.0016, 0.0016, 0.001, 12]} />
+            <meshStandardMaterial color="#88929e" roughness={0.3} metalness={0.8} />
+          </mesh>
+        </group>
+      ) : (
+        /* Node holes and through-cord for 'bridge' and 'v-style' */
+        <group quaternion={quatTangential}>
+          {/* Internal through-cord segment */}
+          <mesh>
+            <cylinderGeometry args={[0.0009, 0.0009, radius * 2, 8]} />
+            <meshStandardMaterial color="#94a3b8" roughness={0.5} />
+          </mesh>
+          {/* Eyelet grommets at the tube entry/exit */}
+          <mesh position={[0, radius + 0.0002, 0]} rotation={[0, 0, Math.PI / 2]}>
+            <torusGeometry args={[0.0022, 0.0008, 8, 16]} />
+            <meshStandardMaterial color="#2d3748" roughness={0.4} metalness={0.5} />
+          </mesh>
+          <mesh position={[0, -radius - 0.0002, 0]} rotation={[0, 0, Math.PI / 2]}>
+            <torusGeometry args={[0.0022, 0.0008, 8, 16]} />
+            <meshStandardMaterial color="#2d3748" roughness={0.4} metalness={0.5} />
+          </mesh>
+        </group>
+      )}
+
       {/* Suspension point marker band */}
       <mesh position={[0, 0, 0]}>
-        <cylinderGeometry args={[radius * 1.015 + 0.0002, radius * 1.015 + 0.0002, 0.004, 32, 1, true]} />
+        <cylinderGeometry args={[radius * 1.015 + 0.0002, radius * 1.015 + 0.0002, 0.0035, 32, 1, true]} />
         <meshStandardMaterial color={bandColor} roughness={0.6} metalness={0.15} side={THREE.DoubleSide} />
       </mesh>
     </group>
@@ -290,35 +340,143 @@ function Sail({ dropY }: { dropY: number }) {
   )
 }
 
+function SpreaderBars() {
+  const { config, tubes } = useStore()
+  const tubeCount = config.tubeCount
+  const ringR = config.suspensionRadius_mm / 1000
+
+  const spreaders = useMemo(() => {
+    return Array.from({ length: tubeCount }, (_, i) => {
+      const a = (i / tubeCount) * Math.PI * 2
+      const x = Math.cos(a) * ringR, z = Math.sin(a) * ringR
+      const tx = -Math.sin(a), tz = Math.cos(a)
+      const mount = tubeMountingPosition(config, tubes, i)
+      const topY = mount.top_mm / 1000
+      const geo = tubeGeometry(config, i)
+      const radius = geo.Do / 2
+      const ySpread = -(topY >= 0.025 ? Math.max(0.012, topY - 0.016) : topY * 0.55)
+      const w = radius + 0.007
+      const length = w * 2
+
+      const dir = new THREE.Vector3(tx, 0, tz).normalize()
+      const quat = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir)
+
+      return {
+        key: i,
+        pos: [x, ySpread, z] as [number, number, number],
+        quat,
+        length,
+        radius: 0.0016,
+      }
+    })
+  }, [tubeCount, ringR, config, tubes])
+
+  return (
+    <group>
+      {spreaders.map((s) => (
+        <group key={s.key} position={s.pos} quaternion={s.quat}>
+          {/* Main horizontal spreader bar */}
+          <mesh castShadow>
+            <cylinderGeometry args={[s.radius, s.radius, s.length, 16]} />
+            <meshStandardMaterial color="#3a2f26" roughness={0.4} metalness={0.15} />
+          </mesh>
+          {/* Polished brass end collars */}
+          <mesh position={[0, s.length / 2, 0]}>
+            <sphereGeometry args={[s.radius * 1.5, 12, 12]} />
+            <meshStandardMaterial color="#c09a5c" roughness={0.3} metalness={0.8} />
+          </mesh>
+          <mesh position={[0, -s.length / 2, 0]}>
+            <sphereGeometry args={[s.radius * 1.5, 12, 12]} />
+            <meshStandardMaterial color="#c09a5c" roughness={0.3} metalness={0.8} />
+          </mesh>
+        </group>
+      ))}
+    </group>
+  )
+}
+
 function Strings() {
   const { config, tubes } = useStore()
   const tubeCount = config.tubeCount
   const ringR = config.suspensionRadius_mm / 1000
-  const lines = useMemo(() => {
-    const pts: [number, number, number, number][] = []
+  const style = config.mountingStyle ?? 'bridge'
+
+  const linePoints = useMemo(() => {
+    const pts: number[] = []
+
     for (let i = 0; i < tubeCount; i++) {
       const a = (i / tubeCount) * Math.PI * 2
       const x = Math.cos(a) * ringR, z = Math.sin(a) * ringR
+      const tx = -Math.sin(a), tz = Math.cos(a)
       const mount = tubeMountingPosition(config, tubes, i)
-      const hang = mount.susp_mm / 1000
-      pts.push([x, 0, z, -hang])
+      const topY = mount.top_mm / 1000
+      const suspY = mount.susp_mm / 1000
+      const geo = tubeGeometry(config, i)
+      const radius = geo.Do / 2
+
+      if (style === 'center') {
+        // center: a single line running inside the tube, attached to an internal suspension bar
+        pts.push(
+          x, 0, z,
+          x, -suspY, z
+        )
+      } else if (style === 'v-style') {
+        // V-style: two lines from every tube to the top plate, creating a V shape
+        const deltaA = Math.min(0.38, (Math.PI / tubeCount) * 0.65)
+        const p1x = Math.cos(a - deltaA) * ringR
+        const p1z = Math.sin(a - deltaA) * ringR
+        const p2x = Math.cos(a + deltaA) * ringR
+        const p2z = Math.sin(a + deltaA) * ringR
+
+        // Tube mounting points at node holes
+        const m1x = x - tx * radius, m1z = z - tz * radius
+        const m2x = x + tx * radius, m2z = z + tz * radius
+
+        // Line 1: P1 -> M1
+        pts.push(p1x, 0, p1z, m1x, -suspY, m1z)
+        // Line 2: P2 -> M2
+        pts.push(p2x, 0, p2z, m2x, -suspY, m2z)
+      } else {
+        // bridge: A single line from the top plate, splitting at a spreader bar
+        // and running together again to the mounting point of the tube
+        const ySpread = -(topY >= 0.025 ? Math.max(0.012, topY - 0.016) : topY * 0.55)
+        const yApex = Math.min(-0.004, ySpread + 0.007)
+        const w = radius + 0.007
+
+        // Spreader ends
+        const e1x = x - tx * w, e1z = z - tz * w
+        const e2x = x + tx * w, e2z = z + tz * w
+
+        // Tube mounting points
+        const m1x = x - tx * radius, m1z = z - tz * radius
+        const m2x = x + tx * radius, m2z = z + tz * radius
+
+        // 1. Single line from top plate to apex
+        pts.push(x, 0, z, x, yApex, z)
+        // 2. Splitting at spreader bar: apex to spreader ends
+        pts.push(x, yApex, z, e1x, ySpread, e1z)
+        pts.push(x, yApex, z, e2x, ySpread, e2z)
+        // 3. Lines from spreader bar ends running together again to tube mounting points
+        pts.push(e1x, ySpread, e1z, m1x, -suspY, m1z)
+        pts.push(e2x, ySpread, e2z, m2x, -suspY, m2z)
+      }
     }
-    return pts
-  }, [tubeCount, ringR, config, tubes])
+
+    return new Float32Array(pts)
+  }, [tubeCount, ringR, style, config, tubes])
+
+  const lineGeo = useMemo(() => {
+    const geo = new THREE.BufferGeometry()
+    geo.setAttribute('position', new THREE.BufferAttribute(linePoints, 3))
+    return geo
+  }, [linePoints])
 
   return (
     <group position={[0, 0, 0]}>
-      {lines.map((p, i) => {
-        const geo = new THREE.BufferGeometry().setFromPoints([
-          new THREE.Vector3(p[0], 0, p[2]),
-          new THREE.Vector3(p[0], p[3], p[2]),
-        ])
-        return (
-          <group key={i}>
-            <primitive object={new THREE.Line(geo, new THREE.LineBasicMaterial({ color: '#666' }))} />
-          </group>
-        )
-      })}
+      <lineSegments geometry={lineGeo}>
+        <lineBasicMaterial color="#a0acbc" />
+      </lineSegments>
+      {style === 'bridge' && <SpreaderBars />}
     </group>
   )
 }
@@ -393,42 +551,89 @@ function Simulator() {
   return null
 }
 
+function TopPlateGrommets() {
+  const { config } = useStore()
+  const tubeCount = config.tubeCount
+  const ringR = config.suspensionRadius_mm / 1000
+  const style = config.mountingStyle ?? 'bridge'
+
+  const grommetPositions = useMemo(() => {
+    const pts: [number, number, number][] = []
+    if (style === 'v-style') {
+      const deltaA = Math.min(0.38, (Math.PI / tubeCount) * 0.65)
+      for (let i = 0; i < tubeCount; i++) {
+        const a = (i / tubeCount) * Math.PI * 2
+        pts.push([Math.cos(a - deltaA) * ringR, 0.0005, Math.sin(a - deltaA) * ringR])
+        pts.push([Math.cos(a + deltaA) * ringR, 0.0005, Math.sin(a + deltaA) * ringR])
+      }
+    } else {
+      for (let i = 0; i < tubeCount; i++) {
+        const a = (i / tubeCount) * Math.PI * 2
+        pts.push([Math.cos(a) * ringR, 0.0005, Math.sin(a) * ringR])
+      }
+    }
+    // striker central cord hole
+    pts.push([0, 0.0005, 0])
+    return pts
+  }, [tubeCount, ringR, style])
+
+  return (
+    <group>
+      {grommetPositions.map((p, i) => (
+        <mesh key={i} position={p} rotation={[-Math.PI / 2, 0, 0]}>
+          <ringGeometry args={[0.001, 0.0028, 16]} />
+          <meshStandardMaterial color="#181c24" roughness={0.4} metalness={0.6} side={THREE.DoubleSide} />
+        </mesh>
+      ))}
+    </group>
+  )
+}
+
 function TopPlate() {
   const { config } = useStore()
   const R = config.plateRadius_mm / 1000
   const mat = <meshStandardMaterial color={config.plateColor} roughness={0.4} metalness={0.1} />
-  switch (config.plateShape) {
-    case 'ring': {
-      const shape = new THREE.Shape()
-      shape.absarc(0, 0, R, 0, Math.PI * 2, false)
-      const hole = new THREE.Path()
-      hole.absarc(0, 0, R * 0.35, 0, Math.PI * 2, true)
-      shape.holes.push(hole)
-      return <mesh position={[0, 0.005, 0]} castShadow rotation={[-Math.PI / 2, 0, 0]}>
-        <extrudeGeometry args={[shape, { depth: 0.02, bevelEnabled: false }]} />{mat}
-      </mesh>
-    }
-    case 'octagon': {
-      const s = new THREE.Shape()
-      for (let k = 0; k < 8; k++) {
-        const a = (k / 8) * Math.PI * 2 + Math.PI / 8
-        const px = Math.cos(a) * R, py = Math.sin(a) * R
-        if (k === 0) s.moveTo(px, py); else s.lineTo(px, py)
+  const plateMesh = (() => {
+    switch (config.plateShape) {
+      case 'ring': {
+        const shape = new THREE.Shape()
+        shape.absarc(0, 0, R, 0, Math.PI * 2, false)
+        const hole = new THREE.Path()
+        hole.absarc(0, 0, R * 0.35, 0, Math.PI * 2, true)
+        shape.holes.push(hole)
+        return <mesh position={[0, 0.005, 0]} castShadow rotation={[-Math.PI / 2, 0, 0]}>
+          <extrudeGeometry args={[shape, { depth: 0.02, bevelEnabled: false }]} />{mat}
+        </mesh>
       }
-      s.closePath()
-      return <mesh position={[0, 0.005, 0]} castShadow rotation={[-Math.PI / 2, 0, 0]}>
-        <extrudeGeometry args={[s, { depth: 0.02, bevelEnabled: false }]} />{mat}
-      </mesh>
+      case 'octagon': {
+        const s = new THREE.Shape()
+        for (let k = 0; k < 8; k++) {
+          const a = (k / 8) * Math.PI * 2 + Math.PI / 8
+          const px = Math.cos(a) * R, py = Math.sin(a) * R
+          if (k === 0) s.moveTo(px, py); else s.lineTo(px, py)
+        }
+        s.closePath()
+        return <mesh position={[0, 0.005, 0]} castShadow rotation={[-Math.PI / 2, 0, 0]}>
+          <extrudeGeometry args={[s, { depth: 0.02, bevelEnabled: false }]} />{mat}
+        </mesh>
+      }
+      case 'square':
+        return <mesh position={[0, 0.005, 0]} castShadow rotation={[-Math.PI / 2, 0, 0]}>
+          <boxGeometry args={[R * 1.8, R * 1.8, 0.02]} />{mat}
+        </mesh>
+      default:          // disc
+        return <mesh position={[0, 0.01, 0]} castShadow>
+          <cylinderGeometry args={[R, R, 0.02, 48]} />{mat}
+        </mesh>
     }
-    case 'square':
-      return <mesh position={[0, 0.005, 0]} castShadow rotation={[-Math.PI / 2, 0, 0]}>
-        <boxGeometry args={[R * 1.8, R * 1.8, 0.02]} />{mat}
-      </mesh>
-    default:          // disc
-      return <mesh position={[0, 0.01, 0]} castShadow>
-        <cylinderGeometry args={[R, R, 0.02, 48]} />{mat}
-      </mesh>
-  }
+  })()
+
+  return (
+    <group>
+      {plateMesh}
+      <TopPlateGrommets />
+    </group>
+  )
 }
 
 export function ChimeScene() {
