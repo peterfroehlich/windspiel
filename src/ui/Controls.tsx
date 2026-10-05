@@ -1167,7 +1167,7 @@ const TUBE_ALIGNMENT_OPTIONS: { id: TubeAlignment; label: string }[] = [
 
 function MountingSection() {
   const { config, setConfig } = useStore()
-  const currentStyle = config.mountingStyle ?? 'bridge'
+  const currentStyle = config.mountingStyle ?? 'center'
 
   return (
     <>
@@ -1195,7 +1195,7 @@ function MountingSection() {
           <span><strong>Center:</strong> Single line drops straight inside the hollow tube, anchored to an internal horizontal suspension cross-bar at the 22.4% node.</span>
         )}
         {currentStyle === 'v-style' && (
-          <span><strong>V-Style:</strong> Two lines from every tube run up to separate holes on the top plate, forming a V shape that stabilizes against twisting.</span>
+          <span><strong>V-Style:</strong> Lines on the shared side of adjacent tubes run into the same hole on the top plate, forming a triangulated V shape that stabilizes against twisting.</span>
         )}
       </div>
       <Slider

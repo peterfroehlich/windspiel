@@ -187,7 +187,7 @@ export const HELP: Record<string, string> = {
     'Suspension mounting method for acoustic isolation: ' +
     '"Bridge": A single line drops from the top plate, splits at a horizontal spreader bar wider than the tube, and runs together again to the tube node holes without rubbing the rim; ' +
     '"Center": A single line runs inside the tube, attaching to an internal suspension cross-bar at the 22.4% node for a clean exterior; ' +
-    '"V-style": Two lines run from each tube up to separate holes on the top plate, creating a triangulated V shape that resists torsional spinning.',
+    '"V-style": Lines on the shared side of adjacent tubes run into the same hole on the top plate, creating a triangulated V shape that resists torsional spinning.',
 
   sailShape:
     'Shape of the wind catcher at the bottom. The physics only cares about its area ' +

@@ -8,6 +8,7 @@ import { WindSim } from '../physics/wind'
 import { audio } from '../audio/engine'
 import { partialExcitation } from '../physics/contact'
 import { tubeFrequencies } from '../physics/tubes'
+import { computeStringLinePoints, computeGrommetPositions } from './mounting'
 
 export const windSim = new WindSim()
 
@@ -65,7 +66,7 @@ function TubeMesh({ index }: { index: number }) {
     g.rotation.x = Math.cos(ph * 0.87) * amp * 0.8
   })
 
-  const style = config.mountingStyle ?? 'bridge'
+  const style = config.mountingStyle ?? 'center'
   const quatTangential = useMemo(() => {
     const dir = new THREE.Vector3(-Math.sin(angle), 0, Math.cos(angle)).normalize()
     return new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir)
@@ -397,73 +398,11 @@ function SpreaderBars() {
 
 function Strings() {
   const { config, tubes } = useStore()
-  const tubeCount = config.tubeCount
-  const ringR = config.suspensionRadius_mm / 1000
-  const style = config.mountingStyle ?? 'bridge'
+  const style = config.mountingStyle ?? 'center'
 
   const linePoints = useMemo(() => {
-    const pts: number[] = []
-
-    for (let i = 0; i < tubeCount; i++) {
-      const a = (i / tubeCount) * Math.PI * 2
-      const x = Math.cos(a) * ringR, z = Math.sin(a) * ringR
-      const tx = -Math.sin(a), tz = Math.cos(a)
-      const mount = tubeMountingPosition(config, tubes, i)
-      const topY = mount.top_mm / 1000
-      const suspY = mount.susp_mm / 1000
-      const geo = tubeGeometry(config, i)
-      const radius = geo.Do / 2
-
-      if (style === 'center') {
-        // center: a single line running inside the tube, attached to an internal suspension bar
-        pts.push(
-          x, 0, z,
-          x, -suspY, z
-        )
-      } else if (style === 'v-style') {
-        // V-style: two lines from every tube to the top plate, creating a V shape
-        const deltaA = Math.min(0.38, (Math.PI / tubeCount) * 0.65)
-        const p1x = Math.cos(a - deltaA) * ringR
-        const p1z = Math.sin(a - deltaA) * ringR
-        const p2x = Math.cos(a + deltaA) * ringR
-        const p2z = Math.sin(a + deltaA) * ringR
-
-        // Tube mounting points at node holes
-        const m1x = x - tx * radius, m1z = z - tz * radius
-        const m2x = x + tx * radius, m2z = z + tz * radius
-
-        // Line 1: P1 -> M1
-        pts.push(p1x, 0, p1z, m1x, -suspY, m1z)
-        // Line 2: P2 -> M2
-        pts.push(p2x, 0, p2z, m2x, -suspY, m2z)
-      } else {
-        // bridge: A single line from the top plate, splitting at a spreader bar
-        // and running together again to the mounting point of the tube
-        const ySpread = -(topY >= 0.025 ? Math.max(0.012, topY - 0.016) : topY * 0.55)
-        const yApex = Math.min(-0.004, ySpread + 0.007)
-        const w = radius + 0.007
-
-        // Spreader ends
-        const e1x = x - tx * w, e1z = z - tz * w
-        const e2x = x + tx * w, e2z = z + tz * w
-
-        // Tube mounting points
-        const m1x = x - tx * radius, m1z = z - tz * radius
-        const m2x = x + tx * radius, m2z = z + tz * radius
-
-        // 1. Single line from top plate to apex
-        pts.push(x, 0, z, x, yApex, z)
-        // 2. Splitting at spreader bar: apex to spreader ends
-        pts.push(x, yApex, z, e1x, ySpread, e1z)
-        pts.push(x, yApex, z, e2x, ySpread, e2z)
-        // 3. Lines from spreader bar ends running together again to tube mounting points
-        pts.push(e1x, ySpread, e1z, m1x, -suspY, m1z)
-        pts.push(e2x, ySpread, e2z, m2x, -suspY, m2z)
-      }
-    }
-
-    return new Float32Array(pts)
-  }, [tubeCount, ringR, style, config, tubes])
+    return computeStringLinePoints(config, tubes)
+  }, [config, tubes])
 
   const lineGeo = useMemo(() => {
     const geo = new THREE.BufferGeometry()
@@ -555,26 +494,10 @@ function TopPlateGrommets() {
   const { config } = useStore()
   const tubeCount = config.tubeCount
   const ringR = config.suspensionRadius_mm / 1000
-  const style = config.mountingStyle ?? 'bridge'
+  const style = config.mountingStyle ?? 'center'
 
   const grommetPositions = useMemo(() => {
-    const pts: [number, number, number][] = []
-    if (style === 'v-style') {
-      const deltaA = Math.min(0.38, (Math.PI / tubeCount) * 0.65)
-      for (let i = 0; i < tubeCount; i++) {
-        const a = (i / tubeCount) * Math.PI * 2
-        pts.push([Math.cos(a - deltaA) * ringR, 0.0005, Math.sin(a - deltaA) * ringR])
-        pts.push([Math.cos(a + deltaA) * ringR, 0.0005, Math.sin(a + deltaA) * ringR])
-      }
-    } else {
-      for (let i = 0; i < tubeCount; i++) {
-        const a = (i / tubeCount) * Math.PI * 2
-        pts.push([Math.cos(a) * ringR, 0.0005, Math.sin(a) * ringR])
-      }
-    }
-    // striker central cord hole
-    pts.push([0, 0.0005, 0])
-    return pts
+    return computeGrommetPositions(tubeCount, ringR, style)
   }, [tubeCount, ringR, style])
 
   return (
