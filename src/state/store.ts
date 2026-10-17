@@ -100,7 +100,7 @@ export const DEFAULT_CONFIG: ChimeConfig = {
   plateColor: '#3a2f24',
   tubeDrop_mm: 30,
   tubeAlignment: 'centerStrike',
-  mountingStyle: 'bridge',
+  mountingStyle: 'center',
   sailType: 'rectangle',
   sailColor: '#8b3a3a',
   gustFrequency: 0.15,

@@ -78,7 +78,7 @@ export function DesignTipsModal({ onClose }: { onClose: () => void }) {
                   Option C: V-Style Triangulation
                 </div>
                 <p style={{ margin: 0, fontSize: '12px', lineHeight: 1.5, color: '#aeb8cc' }}>
-                  Two lines run from every tube up to separate spaced holes in the top canopy, forming a <b>distinct V shape</b>. Triangulation prevents torsional tube spin and stabilizes tube orientation in brisk winds.
+                  Lines on the shared side of adjacent tubes run into the same hole in the top canopy, forming a <b>distinct triangulated V shape</b>. This prevents torsional tube spin and stabilizes tube orientation in brisk winds.
                 </p>
               </div>
             </div>
