@@ -20,7 +20,7 @@ import { listPresets as presetsList, savePreset, loadPreset, deletePreset } from
 import { generateShareUrl, copyToClipboard } from '../state/share'
 import { estimateCut, freqToNote, calculateMaterialCalibration } from '../physics/tuning'
 import { AudioPitchTracker } from '../audio/pitchDetector'
-import { downloadStrikerSTL } from '../physics/stlExport'
+import { downloadStrikerSTL, downloadTubeMountSTL, calculateTubeMountDimensions } from '../physics/stlExport'
 import { NotePicker } from './NotePicker'
 
 
@@ -224,6 +224,7 @@ type SectionId =
   | 'mfgTuning'
   | 'mfgCalibration'
   | 'mfgStriker'
+  | 'mfgTubeMount'
 
 /** Collapsible sidebar section. Multiple sections can be open at once and the
  *  sidebar scrolls. Folded sections unmount (cheap) — all values are derived
@@ -366,6 +367,7 @@ export function Controls() {
     mfgTuning: true,
     mfgCalibration: true,
     mfgStriker: true,
+    mfgTubeMount: true,
   })
   const toggle = (id: SectionId) => setOpen((o) => ({ ...o, [id]: !o[id] }))
 
@@ -1247,6 +1249,12 @@ function ManufacturingTab({
   const [cordHoleMm, setCordHoleMm] = useState('2.0')
   const [tipsOpen, setTipsOpen] = useState(false)
 
+  // Internal Tube Mount tool state
+  const [mountTubeHoleMm, setMountTubeHoleMm] = useState('4.5')
+  const [mountCordHoleMm, setMountCordHoleMm] = useState('2.0')
+  const [mountPart, setMountPart] = useState<'both' | 'male' | 'female'>('both')
+  const [mountStlExported, setMountStlExported] = useState(false)
+
   const trackerRef = useRef<AudioPitchTracker | null>(null)
 
   const checkScroll = () => {
@@ -1447,6 +1455,32 @@ function ManufacturingTab({
     })
     setStlExported(true)
     setTimeout(() => setStlExported(false), 2500)
+  }
+
+  // Internal Tube Mount calculations & download handler
+  const activeSusp = tubeSuspension(config, tubes, activeIdx)
+  const parsedMountHole = parseFloat(mountTubeHoleMm) > 0 ? parseFloat(mountTubeHoleMm) : 4.5
+  const parsedMountCord = parseFloat(mountCordHoleMm) > 0 ? parseFloat(mountCordHoleMm) : 2.0
+  const mfgTubeMountDims = calculateTubeMountDimensions({
+    tubeOuterDiameter_mm: activeGeom.Do * 1000,
+    tubeWallThickness_mm: activeGeom.solid ? 2.0 : activeGeom.t * 1000,
+    tubeHoleDiameter_mm: parsedMountHole,
+    cordHoleDiameter_mm: parsedMountCord,
+    part: mountPart,
+    tubeIndex: activeIdx,
+  })
+
+  const handleDownloadTubeMountSTL = () => {
+    downloadTubeMountSTL({
+      tubeOuterDiameter_mm: activeGeom.Do * 1000,
+      tubeWallThickness_mm: activeGeom.solid ? 2.0 : activeGeom.t * 1000,
+      tubeHoleDiameter_mm: parsedMountHole,
+      cordHoleDiameter_mm: parsedMountCord,
+      part: mountPart,
+      tubeIndex: activeIdx,
+    })
+    setMountStlExported(true)
+    setTimeout(() => setMountStlExported(false), 2500)
   }
 
   // Calculate new suspension hole position
@@ -1985,6 +2019,150 @@ function ManufacturingTab({
             </button>
             <div className="mfg-striker-hint">
               Watertight 3D model with central suspension cord hole. Ready to slice for 3D printing (PETG/PLA) or lathe/turning.
+            </div>
+          </div>
+        </div>
+      </Section>
+
+      {/* ────────────────── Section 5: Internal Tube Mount ────────────────── */}
+      <Section id="mfgTubeMount" title="Internal Tube Mount" open={open} toggle={toggle}>
+        <div className="mfg-striker-mount-card">
+          <div className="mfg-striker-mount-header">
+            <span className="mfg-mount-label">Sized for:</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <select
+                id="mfg-mount-tube-pick"
+                className="mfg-tube-select"
+                style={{ fontSize: 11, padding: '2px 6px' }}
+                value={activeIdx}
+                onChange={(e) => {
+                  const idx = parseInt(e.target.value, 10)
+                  setSelectedTubeIndex(idx)
+                }}
+                title="Select tube to customize internal mount dimensions"
+              >
+                {tubes.map((t, i) => (
+                  <option key={i} value={i}>
+                    Tube #{i + 1} ({t.note}) · Ø {(tubeGeometry(config, i).Do * 1000).toFixed(1)} mm
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+          <div className="mfg-mount-hint">
+            Wall: {activeGeom.solid ? 'solid' : `${(activeGeom.t * 1000).toFixed(2)} mm`} • Nodal suspension: {activeSusp.mm.toFixed(1)} mm from top ({((activeSusp.fraction) * 100).toFixed(1)}%)
+          </div>
+        </div>
+
+        <div className="mfg-striker-card">
+          <div className="mfg-striker-header">
+            <div className="mfg-striker-title">
+              <span>🖨️ Internal Tube Mount (STL)</span>
+            </div>
+            <span className="mfg-striker-badge">
+              Center Mount • 2-Part Rod
+            </span>
+          </div>
+
+          <div className="mfg-striker-grid">
+            <div className="mfg-striker-prop">
+              <span className="mfg-prop-label">Tube Ø:</span>
+              <strong>{(activeGeom.Do * 1000).toFixed(1)} mm</strong>
+            </div>
+            <div className="mfg-striker-prop">
+              <span className="mfg-prop-label">Span:</span>
+              <strong>{mfgTubeMountDims.span.toFixed(1)} mm</strong>
+            </div>
+            <div className="mfg-striker-prop" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+              <span className="mfg-prop-label">Drilled hole:</span>
+              <input
+                type="number"
+                step="0.5"
+                min="2.5"
+                max="10"
+                value={mountTubeHoleMm}
+                onChange={(e) => setMountTubeHoleMm(e.target.value)}
+                className="mfg-hole-input"
+                title="Drilled suspension hole diameter in tube wall in mm"
+              />
+              <span style={{ fontSize: 10, color: '#7b88a1' }}>mm</span>
+            </div>
+            <div className="mfg-striker-prop" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+              <span className="mfg-prop-label">Cord hole:</span>
+              <input
+                type="number"
+                step="0.5"
+                min="1"
+                max="5"
+                value={mountCordHoleMm}
+                onChange={(e) => setMountCordHoleMm(e.target.value)}
+                className="mfg-hole-input"
+                title="Diameter of hole for hanging thread in exact middle in mm"
+              />
+              <span style={{ fontSize: 10, color: '#7b88a1' }}>mm</span>
+            </div>
+            <div className="mfg-striker-prop">
+              <span className="mfg-prop-label">Rod shaft:</span>
+              <strong>Ø {mfgTubeMountDims.rodDiameter.toFixed(1)} mm</strong>
+            </div>
+            <div className="mfg-striker-prop">
+              <span className="mfg-prop-label">Raised edges:</span>
+              <strong>Ø {mfgTubeMountDims.flangeDiameter.toFixed(1)} mm</strong>
+            </div>
+            <div className="mfg-striker-prop" style={{ gridColumn: 'span 2' }}>
+              <span className="mfg-prop-label">Hanging thread hole:</span>
+              <strong>{mfgTubeMountDims.cordHolePosFromFlange.toFixed(1)} mm</strong>
+              <span className="mfg-prop-sub">(exact middle between outer flanges)</span>
+            </div>
+            <div className="mfg-striker-prop" style={{ gridColumn: 'span 2' }}>
+              <span className="mfg-prop-label">Thread:</span>
+              <strong>M{mfgTubeMountDims.threadMajorDia.toFixed(1)} × {mfgTubeMountDims.pitch.toFixed(2)} mm</strong>
+              <span className="mfg-prop-sub">({mfgTubeMountDims.threadLength.toFixed(1)} mm depth, 0.25mm 3D-print tolerance)</span>
+            </div>
+          </div>
+
+          {/* Part Selection */}
+          <div className="mfg-mount-part-selector">
+            <span className="mfg-prop-label">Export:</span>
+            <div className="mfg-part-pill-group">
+              <button
+                type="button"
+                className={`mfg-part-pill ${mountPart === 'both' ? 'active' : ''}`}
+                onClick={() => setMountPart('both')}
+                title="Both parts standing side-by-side on print bed (single print job)"
+              >
+                Both Parts
+              </button>
+              <button
+                type="button"
+                className={`mfg-part-pill ${mountPart === 'male' ? 'active' : ''}`}
+                onClick={() => setMountPart('male')}
+                title="Part A: Male threaded rod with central cord hole and raised edge"
+              >
+                Part A (Male)
+              </button>
+              <button
+                type="button"
+                className={`mfg-part-pill ${mountPart === 'female' ? 'active' : ''}`}
+                onClick={() => setMountPart('female')}
+                title="Part B: Female threaded rod with internal socket and raised edge"
+              >
+                Part B (Female)
+              </button>
+            </div>
+          </div>
+
+          <div className="mfg-striker-actions">
+            <button
+              type="button"
+              className="mfg-stl-btn"
+              onClick={handleDownloadTubeMountSTL}
+              title={`Download 3D printable binary STL for Tube #${activeIdx + 1}: ${mountPart === 'both' ? 'Both Parts' : mountPart === 'male' ? 'Part A (Male)' : 'Part B (Female)'}`}
+            >
+              {mountStlExported ? '✓ STL Downloaded!' : '💾 Download Internal Mount STL'}
+            </button>
+            <div className="mfg-striker-hint">
+              A two-part rod connected with a thread with a hole for a hanging thread in the exact middle, with slightly raised edges so it does not fall out. Insert Part A and Part B from opposite sides through the drilled tube holes and screw together inside.
             </div>
           </div>
         </div>

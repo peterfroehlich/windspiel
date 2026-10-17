@@ -6,7 +6,14 @@ import {
   calculateStrikerDiameter_mm,
   optimalStrikerMass,
 } from './contact'
-import { generateStrikerSTL, buildStrikerGeometry } from './stlExport'
+import {
+  generateStrikerSTL,
+  buildStrikerGeometry,
+  calculateTubeMountDimensions,
+  buildTubeMountGeometry,
+  generateTubeMountSTL,
+  TubeMountSTLOptions,
+} from './stlExport'
 import * as THREE from 'three'
 
 describe('contact: striker sizing & mass', () => {
@@ -206,5 +213,69 @@ describe('stlExport: striker 3D mesh generation', () => {
     expect(v3).toBeLessThan(v6)
     expect(v6).toBeLessThan(v8)
     expect(v8).toBeLessThan(vCyl)
+  })
+})
+
+describe('stlExport: internal tube mount 3D mesh generation', () => {
+  it('calculateTubeMountDimensions places cord hole in the exact middle and sizes raised edges', () => {
+    const opts: TubeMountSTLOptions = {
+      tubeOuterDiameter_mm: 30,
+      tubeWallThickness_mm: 1.5,
+      tubeHoleDiameter_mm: 5.0,
+      cordHoleDiameter_mm: 2.2,
+    }
+    const d = calculateTubeMountDimensions(opts)
+
+    // Span equals tube OD + 0.4 mm acoustic clearance
+    expect(d.span).toBe(30.4)
+    // Cord hole is in the exact middle of the span
+    expect(d.cordHolePosFromFlange).toBe(15.2)
+    expect(d.shaftLengthA + d.shaftLengthB).toBeCloseTo(d.span, 4)
+
+    // Raised edges (flanges) are wider than the drilled hole so the rod does not fall out
+    expect(d.flangeDiameter).toBeGreaterThan(d.tubeHoleDia)
+    expect(d.flangeDiameter).toBe(6.6)
+    // Rod shaft has clearance to fit into drilled hole
+    expect(d.rodDiameter).toBeLessThan(d.tubeHoleDia)
+    expect(d.rodDiameter).toBe(4.8)
+  })
+
+  it('generates non-empty binary STL for both parts, male part, and female part', () => {
+    const opts: TubeMountSTLOptions = {
+      tubeOuterDiameter_mm: 25,
+      tubeWallThickness_mm: 1.2,
+      tubeHoleDiameter_mm: 4.5,
+      cordHoleDiameter_mm: 2.0,
+    }
+
+    for (const part of ['both', 'male', 'female'] as const) {
+      const bytes = generateTubeMountSTL({ ...opts, part })
+      // Binary STL has 80-byte header + 4-byte triangle count -> minimum 84 bytes
+      expect(bytes.byteLength).toBeGreaterThan(1000)
+      const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength)
+      const numTriangles = view.getUint32(80, true)
+      expect(numTriangles).toBeGreaterThan(100)
+    }
+  })
+
+  it('scales correctly with varying tube sizes and hole diameters', () => {
+    const smallTube = calculateTubeMountDimensions({
+      tubeOuterDiameter_mm: 15,
+      tubeWallThickness_mm: 1.0,
+      tubeHoleDiameter_mm: 3.5,
+      cordHoleDiameter_mm: 1.5,
+    })
+    const largeTube = calculateTubeMountDimensions({
+      tubeOuterDiameter_mm: 60,
+      tubeWallThickness_mm: 2.5,
+      tubeHoleDiameter_mm: 6.0,
+      cordHoleDiameter_mm: 2.5,
+    })
+
+    expect(smallTube.span).toBe(15.4)
+    expect(largeTube.span).toBe(60.4)
+    expect(largeTube.rodDiameter).toBeGreaterThan(smallTube.rodDiameter)
+    expect(largeTube.flangeDiameter).toBeGreaterThan(smallTube.flangeDiameter)
+    expect(largeTube.flangeDiameter).toBeGreaterThan(largeTube.tubeHoleDia)
   })
 })
