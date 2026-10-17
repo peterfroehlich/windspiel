@@ -486,6 +486,110 @@ function buildParametricFemaleThreadSocket(
 }
 
 /**
+ * Builds one solid pillar (+Y or -Y) bordering a circular cylindrical through-hole along X.
+ * Mathematical surface:
+ *   Inner hole wall: y^2 + (z - zHole)^2 = rHole^2 (circular cylindrical tunnel along X)
+ *   Outer shaft wall: x^2 + y^2 = rRod^2
+ *   Seamless intersection at x = +/- sqrt(rRod^2 - yInner^2).
+ */
+function buildRoundHolePillar(
+  rRod: number,
+  rHole: number,
+  zHole: number,
+  isPositiveY: boolean,
+  numZ = 32,
+  numX = 24
+): THREE.BufferGeometry {
+  const ySign = isPositiveY ? 1 : -1
+  const vertices: number[] = []
+  const indices: number[] = []
+
+  const ringVertices: THREE.Vector3[][] = []
+  for (let j = 0; j <= numZ; j++) {
+    const theta = -Math.PI / 2 + (Math.PI * j) / numZ
+    const z = zHole + rHole * Math.sin(theta)
+    const yInner = Math.max(0, rHole * Math.cos(theta))
+    const xMax = Math.sqrt(Math.max(0, rRod * rRod - yInner * yInner))
+    const phiMax = Math.asin(Math.min(1, xMax / rRod))
+
+    const ring: THREE.Vector3[] = []
+    // 1. Inner circular tunnel wall: x from -xMax to +xMax at y = yInner
+    for (let i = 0; i < numX; i++) {
+      const t = i / numX
+      const x = -xMax + 2 * xMax * t
+      const y = ySign * yInner
+      ring.push(new THREE.Vector3(x, y, z))
+    }
+    // 2. Outer cylinder wall: arc from +phiMax to -phiMax along outer radius
+    for (let i = 0; i < numX; i++) {
+      const t = i / numX
+      const phi = phiMax - 2 * phiMax * t
+      const x = rRod * Math.sin(phi)
+      const y = ySign * (rRod * Math.cos(phi))
+      ring.push(new THREE.Vector3(x, y, z))
+    }
+    ringVertices.push(ring)
+  }
+
+  const ringSize = 2 * numX
+  const baseIndex: number[] = []
+  for (let j = 0; j <= numZ; j++) {
+    baseIndex.push(vertices.length / 3)
+    for (let k = 0; k < ringSize; k++) {
+      const p = ringVertices[j][k]
+      vertices.push(p.x, p.y, p.z)
+    }
+  }
+
+  // Side quads between level j and j + 1
+  for (let j = 0; j < numZ; j++) {
+    const rowA = baseIndex[j]
+    const rowB = baseIndex[j + 1]
+    for (let k = 0; k < ringSize; k++) {
+      const nextK = (k + 1) % ringSize
+      const a0 = rowA + k
+      const a1 = rowA + nextK
+      const b0 = rowB + k
+      const b1 = rowB + nextK
+
+      if (isPositiveY) {
+        indices.push(a0, b0, a1)
+        indices.push(a1, b0, b1)
+      } else {
+        indices.push(a0, a1, b0)
+        indices.push(a1, b1, b0)
+      }
+    }
+  }
+
+  // Bottom cap at j = 0 (z = zHole - rHole)
+  const botRow = baseIndex[0]
+  for (let k = 1; k < ringSize - 1; k++) {
+    if (isPositiveY) {
+      indices.push(botRow, botRow + k + 1, botRow + k)
+    } else {
+      indices.push(botRow, botRow + k, botRow + k + 1)
+    }
+  }
+
+  // Top cap at j = numZ (z = zHole + rHole)
+  const topRow = baseIndex[numZ]
+  for (let k = 1; k < ringSize - 1; k++) {
+    if (isPositiveY) {
+      indices.push(topRow, topRow + k, topRow + k + 1)
+    } else {
+      indices.push(topRow, topRow + k + 1, topRow + k)
+    }
+  }
+
+  const geo = new THREE.BufferGeometry()
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3))
+  geo.setIndex(indices)
+  geo.computeVertexNormals()
+  return geo
+}
+
+/**
  * Generate 3D geometry for Part A (Male rod with raised edge, central cord hole, and male thread stud).
  */
 export function buildTubeMountPartAGeometry(options: TubeMountSTLOptions): THREE.BufferGeometry {
@@ -518,29 +622,11 @@ export function buildTubeMountPartAGeometry(options: TubeMountSTLOptions): THREE
     parts.push(shaftLower)
   }
 
-  // Middle section: two clean solid pillars on +Y and -Y sides of hole (NO interior center fans!)
-  const thetaMax = Math.asin(safeRHole / rRod)
-  const holeSectionHeight = safeRHole * 2
-  const xEdge = Math.sqrt(rRod * rRod - safeRHole * safeRHole)
-
-  // +Y pillar
-  const shape1 = new THREE.Shape()
-  shape1.moveTo(-xEdge, safeRHole)
-  shape1.absarc(0, 0, rRod, Math.PI - thetaMax, thetaMax, true)
-  shape1.lineTo(-xEdge, safeRHole)
-  shape1.closePath()
-  const pillar1 = new THREE.ExtrudeGeometry(shape1, { depth: holeSectionHeight, bevelEnabled: false, curveSegments: 24 })
-  pillar1.translate(0, 0, zHole - safeRHole)
+  // Middle section: two clean solid pillars bordering the round transverse through-hole
+  const pillar1 = buildRoundHolePillar(rRod, safeRHole, zHole, true, 32, 24)
   parts.push(pillar1)
 
-  // -Y pillar
-  const shape2 = new THREE.Shape()
-  shape2.moveTo(xEdge, -safeRHole)
-  shape2.absarc(0, 0, rRod, -thetaMax, Math.PI + thetaMax, true)
-  shape2.lineTo(xEdge, -safeRHole)
-  shape2.closePath()
-  const pillar2 = new THREE.ExtrudeGeometry(shape2, { depth: holeSectionHeight, bevelEnabled: false, curveSegments: 24 })
-  pillar2.translate(0, 0, zHole - safeRHole)
+  const pillar2 = buildRoundHolePillar(rRod, safeRHole, zHole, false, 32, 24)
   parts.push(pillar2)
 
   // Shaft upper section (from hole top to thread shoulder)
