@@ -315,6 +315,25 @@ describe('stlExport: internal tube mount 3D mesh generation', () => {
     const height = box.max.z - box.min.z
     // Finished 3D bounding box height matches width within 0.001 mm
     expect(Math.abs(width - height)).toBeLessThan(0.001)
+
+    // Verify socket is closed on bottom side (z = 0) and open on top side
+    const pos = geoCrossbar.getAttribute('position')
+    let foundBottomCenter = false
+    let foundTopCenter = false
+    for (let i = 0; i < pos.count; i++) {
+      const x = pos.getX(i), y = pos.getY(i), z = pos.getZ(i)
+      const r = Math.sqrt(x * x + y * y)
+      if (Math.abs(z) < 0.001 && r < 0.1) {
+        foundBottomCenter = true
+      }
+      if (Math.abs(z - box.max.z) < 0.001 && r < 0.5) {
+        foundTopCenter = true
+      }
+    }
+    // Bottom (exterior) is solid/closed
+    expect(foundBottomCenter).toBe(true)
+    // Top (interior) has open socket hole
+    expect(foundTopCenter).toBe(false)
   })
 
   it('generates non-empty binary STL for T-mount (both parts, T-rod, and female crossbar)', () => {

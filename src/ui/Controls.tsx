@@ -2179,7 +2179,7 @@ function ManufacturingTab({
                 <div className="mfg-striker-prop" style={{ gridColumn: 'span 2' }}>
                   <span className="mfg-prop-label">Thread:</span>
                   <strong>M{mfgTubeMountDims.tThreadMajorDia.toFixed(1)} × {mfgTubeMountDims.tThreadPitch.toFixed(2)} mm</strong>
-                  <span className="mfg-prop-sub">({mfgTubeMountDims.tThreadLength.toFixed(1)} mm stud &amp; female socket, 0.25mm tolerance)</span>
+                  <span className="mfg-prop-sub">({mfgTubeMountDims.tThreadLength.toFixed(1)} mm stud &amp; blind socket closed on outside, 0.25mm tolerance)</span>
                 </div>
               </>
             )}
@@ -2230,7 +2230,7 @@ function ManufacturingTab({
                     type="button"
                     className={`mfg-part-pill ${mountPart === 'crossbar' ? 'active' : ''}`}
                     onClick={() => setMountPart('crossbar')}
-                    title="Crossbar: Retaining rod with matching dimensions and central female thread"
+                    title="Crossbar: Retaining rod with matching dimensions and central blind female thread"
                   >
                     Crossbar (Female)
                   </button>
@@ -2255,7 +2255,7 @@ function ManufacturingTab({
             <div className="mfg-striker-hint">
               {mountType === 'threaded'
                 ? 'A two-part rod connected with a thread with a hole for a hanging thread in the exact middle, with slightly raised edges so it does not fall out. Insert Part A and Part B from opposite sides through the drilled tube holes and screw together inside.'
-                : 'A T-shaped rod inserted fully through both holes with a male thread on the end, fastened with a matching female threaded crossbar of identical outer dimensions. When tightened, both crossbars form a symmetric H with hanging cord in the middle.'}
+                : 'A T-shaped rod inserted fully through both holes with a male thread on the end, fastened with a matching female threaded crossbar of identical outer dimensions (blind socket closed on outside). When tightened, both crossbars form a symmetric H with hanging cord in the middle.'}
             </div>
           </div>
         </div>

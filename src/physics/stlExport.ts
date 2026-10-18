@@ -807,14 +807,16 @@ function buildCrossbarBody(length: number, width: number, height: number, holeR 
 }
 
 /**
- * Builds the continuous female thread walls inside a cylindrical through-hole.
- * At z = 0 and z = totalHeight, annular rims connect the thread to the hole opening.
+ * Builds the continuous female thread walls inside a cylindrical blind hole socket.
+ * At z = floorZ, the socket floor is closed by an annular rim and center disk.
+ * At z = totalHeight, an annular rim connects the thread to the open hole rim.
  */
-function buildFemaleThreadInHole(
+function buildFemaleThreadBlindSocket(
   majorR: number,
   minorR: number,
   clearance: number,
   pitch: number,
+  floorZ: number,
   totalHeight: number,
   radialSteps = 36,
   heightSteps = 80
@@ -822,33 +824,35 @@ function buildFemaleThreadInHole(
   const effMajorR = majorR + clearance
   const effMinorR = minorR + clearance
   const depth = effMajorR - effMinorR
+  const threadHeight = totalHeight - floorZ
 
   const pos: number[] = []
   const indices: number[] = []
 
-  function getInnerRadius(z: number, theta: number): number {
-    const frac = ((z / pitch) - (theta / (2 * Math.PI))) % 1.0
+  function getInnerRadius(zRel: number, theta: number): number {
+    const frac = ((zRel / pitch) - (theta / (2 * Math.PI))) % 1.0
     const phi = (frac + 1.0) % 1.0
     const profile = 0.5 * (1.0 + Math.cos(2 * Math.PI * (phi - 0.5)))
     let r = effMinorR + depth * (1.0 - profile)
 
     const leadIn = pitch * 0.5
-    if (z > totalHeight - leadIn) {
-      const t = (totalHeight - z) / leadIn
+    if (zRel > threadHeight - leadIn) {
+      const t = (threadHeight - zRel) / leadIn
       r = Math.max(r, effMajorR + 0.15 * (1.0 - t))
     }
-    if (z < leadIn) {
-      const t = z / leadIn
+    if (zRel < leadIn) {
+      const t = zRel / leadIn
       r = Math.max(r, effMajorR + 0.15 * (1.0 - t))
     }
     return r
   }
 
   for (let k = 0; k <= heightSteps; k++) {
-    const z = (k / heightSteps) * totalHeight
+    const zRel = (k / heightSteps) * threadHeight
+    const z = floorZ + zRel
     for (let j = 0; j < radialSteps; j++) {
       const theta = (j / radialSteps) * Math.PI * 2
-      const r = getInnerRadius(z, theta)
+      const r = getInnerRadius(zRel, theta)
       pos.push(r * Math.cos(theta), r * Math.sin(theta), z)
     }
   }
@@ -865,11 +869,12 @@ function buildFemaleThreadInHole(
     }
   }
 
+  // Annular rim at bottom z = floorZ connecting inner thread profile to effMajorR
   const botInnerStart = 0
   const botOuterStart = pos.length / 3
   for (let j = 0; j < radialSteps; j++) {
     const theta = (j / radialSteps) * Math.PI * 2
-    pos.push(effMajorR * Math.cos(theta), effMajorR * Math.sin(theta), 0)
+    pos.push(effMajorR * Math.cos(theta), effMajorR * Math.sin(theta), floorZ)
   }
   for (let j = 0; j < radialSteps; j++) {
     const nextJ = (j + 1) % radialSteps
@@ -877,6 +882,15 @@ function buildFemaleThreadInHole(
     indices.push(botInnerStart + nextJ, botOuterStart + nextJ, botOuterStart + j)
   }
 
+  // Flat floor disk at z = floorZ: triangle fan from center (0, 0, floorZ) to botInnerStart
+  const centerIdx = pos.length / 3
+  pos.push(0, 0, floorZ)
+  for (let j = 0; j < radialSteps; j++) {
+    const nextJ = (j + 1) % radialSteps
+    indices.push(centerIdx, botInnerStart + j, botInnerStart + nextJ)
+  }
+
+  // Top rim at z = totalHeight connecting inner thread profile to effMajorR
   const topInnerStart = heightSteps * radialSteps
   const topOuterStart = pos.length / 3
   for (let j = 0; j < radialSteps; j++) {
@@ -968,6 +982,7 @@ export function buildTRodGeometry(options: TubeMountSTLOptions): THREE.BufferGeo
 /**
  * Generate 3D geometry for the Female Crossbar Rod.
  * It has the exact same dimensions as the short, upper part of the T, with a matching female thread socket in the middle.
+ * The socket is closed on the outer side (blind hole), leaving a solid clean exterior surface.
  */
 export function buildFemaleCrossbarGeometry(options: TubeMountSTLOptions): THREE.BufferGeometry {
   const d = calculateTubeMountDimensions(options)
@@ -979,21 +994,33 @@ export function buildFemaleCrossbarGeometry(options: TubeMountSTLOptions): THREE
   const bevel = 0.35
   const totalBarH = d.crossbarHeight + 2 * bevel
 
-  // 1. Continuous crossbar body with open cylindrical hole in center
+  // The socket is closed on the bottom (outer side at z = 0), and open on top (inner side facing tube)
+  // Socket depth gives clearance past the male thread stud so it seats flush against the tube wall
+  const socketDepth = Math.min(totalBarH - 1.2, d.tThreadLength + 0.5)
+  const floorZ = totalBarH - socketDepth
+
+  // 1. Continuous crossbar body
   const bodyGeo = buildCrossbarBody(d.crossbarLength, d.crossbarWidth, d.crossbarHeight, effMajorR)
 
-  // 2. Internal female helical thread inside the hole
-  const threadGeo = buildFemaleThreadInHole(
+  // 2. Solid base plug closing the hole from z = 0 to z = floorZ
+  const plugGeo = new THREE.CylinderGeometry(effMajorR, effMajorR, floorZ, 36)
+  plugGeo.rotateX(Math.PI / 2)
+  plugGeo.translate(0, 0, floorZ / 2)
+
+  // 3. Internal female helical thread socket from z = floorZ to z = totalBarH
+  const threadGeo = buildFemaleThreadBlindSocket(
     threadMajorDia / 2,
     threadMinorDia / 2,
     clearance,
     pitch,
+    floorZ,
     totalBarH,
     36,
     80
   )
 
-  const merged = BufferGeometryUtils.mergeGeometries([normalizeGeo(bodyGeo), normalizeGeo(threadGeo)], false)
+  const parts = [normalizeGeo(bodyGeo), normalizeGeo(plugGeo), normalizeGeo(threadGeo)]
+  const merged = BufferGeometryUtils.mergeGeometries(parts, false)
   if (!merged) {
     throw new Error('Failed to merge Female Crossbar geometries')
   }
