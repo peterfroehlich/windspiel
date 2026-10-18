@@ -173,7 +173,7 @@ export interface TubeMountSTLOptions {
   tubeHoleDiameter_mm?: number
   cordHoleDiameter_mm?: number
   threadClearance_mm?: number
-  part?: 'both' | 'male' | 'female' | 'trod' | 'splint'
+  part?: 'both' | 'male' | 'female' | 'trod' | 'crossbar' | 'splint'
   mountType?: 'threaded' | 'tmount'
   tubeIndex?: number
 }
@@ -209,6 +209,10 @@ export interface TubeMountDimensions {
   splintWidth: number
   splintThickness: number
   tRodTotalLength: number
+  tThreadMajorDia: number
+  tThreadMinorDia: number
+  tThreadPitch: number
+  tThreadLength: number
 }
 
 /**
@@ -249,17 +253,15 @@ export function calculateTubeMountDimensions(options: TubeMountSTLOptions): Tube
   const threadLength = Math.min(8.0, Math.max(3.5, shaftLengthB - 1.5))
 
   // T-Mount specific calculations:
-  // Upper part of the T (crossbar) and Splint have the exact same length forming an "H"
+  // Both the upper part of the T (crossbar) and the female retaining crossbar Rod have the exact same dimensions
   const crossbarLength = Math.max(14, Math.round(tubeHoleDia * 3.2))
-  const crossbarHeight = Math.max(2.0, rodDiameter * 0.75)
-  const crossbarWidth = rodDiameter
-  const slotWidth = Math.max(1.3, Math.min(2.5, rodDiameter * 0.52))
-  const slotHeight = Math.max(1.6, Math.min(2.6, rodDiameter * 0.55))
-  const splintLength = crossbarLength
-  const splintWidth = slotWidth - 0.25
-  const splintThickness = slotHeight - 0.25
-  const tipLen = Math.max(2.0, rodDiameter * 0.6)
-  const tRodTotalLength = crossbarHeight + span + 0.3 + slotHeight + tipLen + (rodDiameter / 2) * 0.7
+  const crossbarWidth = Math.max(5.6, tubeHoleDia + 1.4)
+  const crossbarHeight = crossbarWidth
+  const tThreadMajorDia = Math.max(2.4, Math.min(rodDiameter - 1.0, 3.2))
+  const tThreadMinorDia = Math.max(1.7, tThreadMajorDia - 0.9)
+  const tThreadPitch = 1.25
+  const tThreadLength = 4.5
+  const tRodTotalLength = crossbarHeight + 0.7 + span + tThreadLength
 
   return {
     tubeOD,
@@ -284,12 +286,16 @@ export function calculateTubeMountDimensions(options: TubeMountSTLOptions): Tube
     crossbarLength,
     crossbarWidth,
     crossbarHeight,
-    slotWidth,
-    slotHeight,
-    splintLength,
-    splintWidth,
-    splintThickness,
+    slotWidth: rodDiameter,
+    slotHeight: rodDiameter,
+    splintLength: crossbarLength,
+    splintWidth: crossbarWidth,
+    splintThickness: crossbarHeight,
     tRodTotalLength,
+    tThreadMajorDia,
+    tThreadMinorDia,
+    tThreadPitch,
+    tThreadLength,
   }
 }
 
@@ -761,7 +767,38 @@ export function buildTubeMountCombinedGeometry(options: TubeMountSTLOptions): TH
 }
 
 /**
- * Generate 3D geometry for the T-Rod (T-shaped pin with upper crossbar, center cord hole, and splint slot).
+ * Builds the solid crossbar body of length L, width W, height H.
+ * With rounded ends and beveled perimeter edges.
+ */
+function buildCrossbarBody(length: number, width: number, height: number): THREE.BufferGeometry {
+  const shape = new THREE.Shape()
+  const rad = Math.min(width, height) * 0.35
+  shape.moveTo(-width / 2 + rad, -height / 2)
+  shape.lineTo(width / 2 - rad, -height / 2)
+  shape.quadraticCurveTo(width / 2, -height / 2, width / 2, -height / 2 + rad)
+  shape.lineTo(width / 2, height / 2 - rad)
+  shape.quadraticCurveTo(width / 2, height / 2, width / 2 - rad, height / 2)
+  shape.lineTo(-width / 2 + rad, height / 2)
+  shape.quadraticCurveTo(-width / 2, height / 2, -width / 2, height / 2 - rad)
+  shape.lineTo(-width / 2, -height / 2 + rad)
+  shape.quadraticCurveTo(-width / 2, -height / 2, -width / 2 + rad, -height / 2)
+
+  const geo = new THREE.ExtrudeGeometry(shape, {
+    depth: length,
+    bevelEnabled: true,
+    bevelSegments: 3,
+    steps: 1,
+    bevelSize: 0.35,
+    bevelThickness: 0.35,
+  })
+  geo.translate(0, 0, -length / 2)
+  geo.rotateX(Math.PI / 2)
+  geo.translate(0, 0, height / 2 + 0.35)
+  return geo
+}
+
+/**
+ * Generate 3D geometry for the T-Rod (T-shaped pin with upper crossbar, center cord hole, and male thread stud at the long end).
  */
 export function buildTRodGeometry(options: TubeMountSTLOptions): THREE.BufferGeometry {
   const d = calculateTubeMountDimensions(options)
@@ -769,36 +806,11 @@ export function buildTRodGeometry(options: TubeMountSTLOptions): THREE.BufferGeo
   const parts: THREE.BufferGeometry[] = []
 
   // 1. Crossbar (Upper part of T)
-  // Stands at Z in [0, crossbarHeight + 0.6] with flat base on Z=0
-  // Symmetrically centered along Y: from -crossbarLength / 2 to +crossbarLength / 2
-  const crossbarShape = new THREE.Shape()
-  const rad = Math.min(d.crossbarWidth, d.crossbarHeight) * 0.25
-  crossbarShape.moveTo(-d.crossbarWidth / 2 + rad, -d.crossbarHeight / 2)
-  crossbarShape.lineTo(d.crossbarWidth / 2 - rad, -d.crossbarHeight / 2)
-  crossbarShape.quadraticCurveTo(d.crossbarWidth / 2, -d.crossbarHeight / 2, d.crossbarWidth / 2, -d.crossbarHeight / 2 + rad)
-  crossbarShape.lineTo(d.crossbarWidth / 2, d.crossbarHeight / 2 - rad)
-  crossbarShape.quadraticCurveTo(d.crossbarWidth / 2, d.crossbarHeight / 2, d.crossbarWidth / 2 - rad, d.crossbarHeight / 2)
-  crossbarShape.lineTo(-d.crossbarWidth / 2 + rad, d.crossbarHeight / 2)
-  crossbarShape.quadraticCurveTo(-d.crossbarWidth / 2, d.crossbarHeight / 2, -d.crossbarWidth / 2, d.crossbarHeight / 2 - rad)
-  crossbarShape.lineTo(-d.crossbarWidth / 2, -d.crossbarHeight / 2 + rad)
-  crossbarShape.quadraticCurveTo(-d.crossbarWidth / 2, -d.crossbarHeight / 2, -d.crossbarWidth / 2 + rad, -d.crossbarHeight / 2)
-
-  const crossbarGeo = new THREE.ExtrudeGeometry(crossbarShape, {
-    depth: d.crossbarLength,
-    bevelEnabled: true,
-    bevelSegments: 3,
-    steps: 1,
-    bevelSize: 0.3,
-    bevelThickness: 0.3,
-  })
-  // Center along Z so when rotated it's centered along Y:
-  crossbarGeo.translate(0, 0, -d.crossbarLength / 2)
-  crossbarGeo.rotateX(Math.PI / 2)
-  crossbarGeo.translate(0, 0, d.crossbarHeight / 2 + 0.3)
+  const crossbarGeo = buildCrossbarBody(d.crossbarLength, d.crossbarWidth, d.crossbarHeight)
   parts.push(crossbarGeo)
 
   // 2. Stem starting from bottom of crossbar
-  const zStemBase = d.crossbarHeight + 0.6
+  const zStemBase = d.crossbarHeight + 0.7
   const zHole = zStemBase + d.span / 2
   const rHole = Math.min(d.cordHoleDia / 2, rRod * 0.7)
 
@@ -816,58 +828,32 @@ export function buildTRodGeometry(options: TubeMountSTLOptions): THREE.BufferGeo
   const pillar2 = buildRoundHolePillar(rRod, rHole, zHole, false, 32, 24)
   parts.push(pillar1, pillar2)
 
-  // Shaft middle section (from cord hole to splint slot)
-  const zSlotStart = zStemBase + d.span + 0.3
-  const lenMid = zSlotStart - (zHole + rHole)
-  if (lenMid > 0) {
-    const shaftMid = new THREE.CylinderGeometry(rRod, rRod, lenMid, 32)
-    shaftMid.rotateX(Math.PI / 2)
-    shaftMid.translate(0, 0, (zHole + rHole) + lenMid / 2)
-    parts.push(shaftMid)
+  // Shaft upper section (from cord hole to exit shoulder)
+  const zShoulder = zStemBase + d.span
+  const lenUpper = zShoulder - (zHole + rHole)
+  if (lenUpper > 0) {
+    const shaftUpper = new THREE.CylinderGeometry(rRod, rRod, lenUpper, 32)
+    shaftUpper.rotateX(Math.PI / 2)
+    shaftUpper.translate(0, 0, (zHole + rHole) + lenUpper / 2)
+    parts.push(shaftUpper)
   }
 
-  // Splint slot section: slot passes through along Y
-  // Solid pillars on +X and -X sides
-  const halfSlotW = d.slotWidth / 2
-  const yEdge = Math.sqrt(Math.max(0, rRod * rRod - halfSlotW * halfSlotW))
-  const aMax = Math.acos(Math.min(1, halfSlotW / rRod))
-  const aMin = -aMax
+  // 3. Male thread stud extending past the shoulder
+  const threadMajorDia = Math.max(2.4, Math.min(d.rodDiameter - 1.0, 3.2))
+  const threadMinorDia = Math.max(1.7, threadMajorDia - 0.9)
+  const pitch = 1.25
+  const threadLength = 4.5
 
-  // +X pillar
-  const shapePX = new THREE.Shape()
-  shapePX.moveTo(halfSlotW, -yEdge)
-  shapePX.absarc(0, 0, rRod, aMin, aMax, false)
-  shapePX.lineTo(halfSlotW, yEdge)
-  shapePX.lineTo(halfSlotW, -yEdge)
-  shapePX.closePath()
-  const slotPillarPX = new THREE.ExtrudeGeometry(shapePX, { depth: d.slotHeight, bevelEnabled: false })
-  slotPillarPX.translate(0, 0, zSlotStart)
-  parts.push(slotPillarPX)
-
-  // -X pillar
-  const shapeNX = new THREE.Shape()
-  shapeNX.moveTo(-halfSlotW, yEdge)
-  shapeNX.absarc(0, 0, rRod, Math.PI - aMax, Math.PI - aMin, false)
-  shapeNX.lineTo(-halfSlotW, -yEdge)
-  shapeNX.lineTo(-halfSlotW, yEdge)
-  shapeNX.closePath()
-  const slotPillarNX = new THREE.ExtrudeGeometry(shapeNX, { depth: d.slotHeight, bevelEnabled: false })
-  slotPillarNX.translate(0, 0, zSlotStart)
-  parts.push(slotPillarNX)
-
-  // Tip section past slot
-  const tipLen = Math.max(2.0, rRod * 0.6)
-  const zTipStart = zSlotStart + d.slotHeight
-  const tipGeo = new THREE.CylinderGeometry(rRod * 0.7, rRod, tipLen, 32)
-  tipGeo.rotateX(Math.PI / 2)
-  tipGeo.translate(0, 0, zTipStart + tipLen / 2)
-  parts.push(tipGeo)
-
-  // Rounded end dome on tip
-  const dome = new THREE.SphereGeometry(rRod * 0.7, 24, 16, 0, Math.PI * 2, 0, Math.PI / 2)
-  dome.rotateX(Math.PI / 2)
-  dome.translate(0, 0, zTipStart + tipLen)
-  parts.push(dome)
+  const maleThread = buildParametricMaleThread(
+    threadMajorDia / 2,
+    threadMinorDia / 2,
+    pitch,
+    threadLength,
+    36,
+    80
+  )
+  maleThread.translate(0, 0, zShoulder)
+  parts.push(maleThread)
 
   const normalized = parts.map(normalizeGeo)
   const merged = BufferGeometryUtils.mergeGeometries(normalized, false)
@@ -879,58 +865,110 @@ export function buildTRodGeometry(options: TubeMountSTLOptions): THREE.BufferGeo
 }
 
 /**
- * Generate 3D geometry for the Splint (retaining pin that inserts through the slot in the T-Rod).
- * The splint has the exact same length as the T crossbar so that the assembly forms an "H".
+ * Generate 3D geometry for the Female Crossbar Rod.
+ * It has the exact same dimensions as the short, upper part of the T, with a matching female thread socket at the middle.
  */
-export function buildSplintGeometry(options: TubeMountSTLOptions): THREE.BufferGeometry {
+export function buildFemaleCrossbarGeometry(options: TubeMountSTLOptions): THREE.BufferGeometry {
   const d = calculateTubeMountDimensions(options)
-  const splintW = d.splintWidth
-  const splintH = d.splintThickness
-  const splintL = d.splintLength // Exactly equals crossbarLength!
+  const threadMajorDia = Math.max(2.4, Math.min(d.rodDiameter - 1.0, 3.2))
+  const threadMinorDia = Math.max(1.7, threadMajorDia - 0.9)
+  const pitch = 1.25
+  const threadLength = 4.5
+  const clearance = 0.25
 
-  const shape = new THREE.Shape()
-  const rad = Math.min(splintW, splintH) * 0.3
-  shape.moveTo(-splintW / 2 + rad, -splintH / 2)
-  shape.lineTo(splintW / 2 - rad, -splintH / 2)
-  shape.quadraticCurveTo(splintW / 2, -splintH / 2, splintW / 2, -splintH / 2 + rad)
-  shape.lineTo(splintW / 2, splintH / 2 - rad)
-  shape.quadraticCurveTo(splintW / 2, splintH / 2, splintW / 2 - rad, splintH / 2)
-  shape.lineTo(-splintW / 2 + rad, splintH / 2)
-  shape.quadraticCurveTo(-splintW / 2, splintH / 2, -splintW / 2, splintH / 2 - rad)
-  shape.lineTo(-splintW / 2, -splintH / 2 + rad)
-  shape.quadraticCurveTo(-splintW / 2, -splintH / 2, -splintW / 2 + rad, -splintH / 2)
+  const totalBodyHeight = d.crossbarHeight + 0.7
+  const socketDepth = threadLength + 0.6 // 0.6mm deeper so it seats flush on shoulder
 
-  const geo = new THREE.ExtrudeGeometry(shape, {
-    depth: splintL,
+  const socketMajorR = (threadMajorDia / 2) + clearance
+  const centerR = Math.max(socketMajorR + 0.8, (d.rodDiameter / 2) + 0.2)
+  const armLen = (d.crossbarLength / 2) - centerR
+
+  const leftShape = new THREE.Shape()
+  const rad = Math.min(d.crossbarWidth, d.crossbarHeight) * 0.35
+  leftShape.moveTo(-d.crossbarWidth / 2 + rad, -d.crossbarHeight / 2)
+  leftShape.lineTo(d.crossbarWidth / 2 - rad, -d.crossbarHeight / 2)
+  leftShape.quadraticCurveTo(d.crossbarWidth / 2, -d.crossbarHeight / 2, d.crossbarWidth / 2, -d.crossbarHeight / 2 + rad)
+  leftShape.lineTo(d.crossbarWidth / 2, d.crossbarHeight / 2 - rad)
+  leftShape.quadraticCurveTo(d.crossbarWidth / 2, d.crossbarHeight / 2, d.crossbarWidth / 2 - rad, d.crossbarHeight / 2)
+  leftShape.lineTo(-d.crossbarWidth / 2 + rad, d.crossbarHeight / 2)
+  leftShape.quadraticCurveTo(-d.crossbarWidth / 2, d.crossbarHeight / 2, -d.crossbarWidth / 2, d.crossbarHeight / 2 - rad)
+  leftShape.lineTo(-d.crossbarWidth / 2, -d.crossbarHeight / 2 + rad)
+  leftShape.quadraticCurveTo(-d.crossbarWidth / 2, -d.crossbarHeight / 2, -d.crossbarWidth / 2 + rad, -d.crossbarHeight / 2)
+
+  const parts: THREE.BufferGeometry[] = []
+
+  // Left arm
+  const leftGeo = new THREE.ExtrudeGeometry(leftShape, {
+    depth: armLen,
     bevelEnabled: true,
     bevelSegments: 3,
     steps: 1,
-    bevelSize: 0.25,
-    bevelThickness: 0.25,
+    bevelSize: 0.35,
+    bevelThickness: 0.35,
   })
+  leftGeo.translate(0, 0, -armLen / 2)
+  leftGeo.rotateX(Math.PI / 2)
+  leftGeo.translate(0, -(centerR + armLen / 2), d.crossbarHeight / 2 + 0.35)
+  parts.push(leftGeo)
 
-  // Center along Z before rotation so when rotated it's centered along Y:
-  geo.translate(0, 0, -splintL / 2)
-  // Lay flat on print bed at Z = 0:
-  geo.rotateX(Math.PI / 2)
-  geo.translate(0, 0, splintH / 2 + 0.25)
-  geo.computeVertexNormals()
-  return normalizeGeo(geo)
+  // Right arm
+  const rightGeo = new THREE.ExtrudeGeometry(leftShape, {
+    depth: armLen,
+    bevelEnabled: true,
+    bevelSegments: 3,
+    steps: 1,
+    bevelSize: 0.35,
+    bevelThickness: 0.35,
+  })
+  rightGeo.translate(0, 0, -armLen / 2)
+  rightGeo.rotateX(Math.PI / 2)
+  rightGeo.translate(0, +(centerR + armLen / 2), d.crossbarHeight / 2 + 0.35)
+  parts.push(rightGeo)
+
+  // Center collar cylinder connecting the arms
+  const collarGeo = new THREE.CylinderGeometry(centerR, centerR, totalBodyHeight, 32)
+  collarGeo.rotateX(Math.PI / 2)
+  collarGeo.translate(0, 0, totalBodyHeight / 2)
+  parts.push(collarGeo)
+
+  // Center female thread socket
+  const socketGeo = buildParametricFemaleThreadSocket(
+    threadMajorDia / 2,
+    threadMinorDia / 2,
+    clearance,
+    pitch,
+    totalBodyHeight,
+    socketDepth,
+    36,
+    80
+  )
+  parts.push(socketGeo)
+
+  const normalized = parts.map(normalizeGeo)
+  const merged = BufferGeometryUtils.mergeGeometries(normalized, false)
+  if (!merged) {
+    throw new Error('Failed to merge Female Crossbar geometries')
+  }
+  merged.computeVertexNormals()
+  return merged
 }
 
+// Alias for backwards compatibility
+export const buildSplintGeometry = buildFemaleCrossbarGeometry
+
 /**
- * Generate 3D geometry with both T-Rod and Splint positioned side-by-side on the print bed.
+ * Generate 3D geometry with both T-Rod and Female Crossbar positioned side-by-side on the print bed.
  */
 export function buildTMountCombinedGeometry(options: TubeMountSTLOptions): THREE.BufferGeometry {
   const d = calculateTubeMountDimensions(options)
   const geoTRod = buildTRodGeometry(options)
-  const geoSplint = buildSplintGeometry(options)
+  const geoCrossbar = buildFemaleCrossbarGeometry(options)
 
-  const spacing = Math.max(16, d.crossbarWidth + d.splintWidth + 10)
+  const spacing = Math.max(16, d.crossbarWidth * 2 + 10)
   geoTRod.translate(-spacing / 2, 0, 0)
-  geoSplint.translate(spacing / 2, 0, 0)
+  geoCrossbar.translate(spacing / 2, 0, 0)
 
-  const combined = BufferGeometryUtils.mergeGeometries([normalizeGeo(geoTRod), normalizeGeo(geoSplint)], false)
+  const combined = BufferGeometryUtils.mergeGeometries([normalizeGeo(geoTRod), normalizeGeo(geoCrossbar)], false)
   if (!combined) {
     throw new Error('Failed to merge combined T-Mount geometries')
   }
@@ -939,15 +977,15 @@ export function buildTMountCombinedGeometry(options: TubeMountSTLOptions): THREE
 }
 
 /**
- * Resolve the requested tube mount geometry: both parts, Part A (male), Part B (female), T-Rod, or Splint.
+ * Resolve the requested tube mount geometry: both parts, Part A (male), Part B (female), T-Rod, or Female Crossbar.
  */
 export function buildTubeMountGeometry(options: TubeMountSTLOptions): THREE.BufferGeometry {
   if (options.mountType === 'tmount') {
     if (options.part === 'trod') {
       return buildTRodGeometry(options)
     }
-    if (options.part === 'splint') {
-      return buildSplintGeometry(options)
+    if (options.part === 'crossbar' || options.part === 'splint') {
+      return buildFemaleCrossbarGeometry(options)
     }
     return buildTMountCombinedGeometry(options)
   }

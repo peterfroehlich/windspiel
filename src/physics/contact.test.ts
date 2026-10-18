@@ -279,7 +279,7 @@ describe('stlExport: internal tube mount 3D mesh generation', () => {
     expect(largeTube.flangeDiameter).toBeGreaterThan(largeTube.tubeHoleDia)
   })
 
-  it('calculates T-mount dimensions where T crossbar and splint have equal length for an H shape', () => {
+  it('calculates T-mount dimensions where T crossbar and female crossbar have equal length for an H shape', () => {
     const opts: TubeMountSTLOptions = {
       tubeOuterDiameter_mm: 30,
       tubeWallThickness_mm: 1.5,
@@ -289,25 +289,16 @@ describe('stlExport: internal tube mount 3D mesh generation', () => {
     }
     const d = calculateTubeMountDimensions(opts)
 
-    // Splint and upper part of T must be the same length so that the assembly looks like an H
-    expect(d.splintLength).toBe(d.crossbarLength)
+    // Upper part of T and female retaining crossbar rod must have the same length so that the assembly looks like an H
     expect(d.crossbarLength).toBeGreaterThan(d.tubeHoleDia)
+    expect(d.crossbarWidth).toBeGreaterThan(d.rodDiameter)
+    expect(d.crossbarHeight).toBe(d.crossbarWidth)
 
-    // Slot is contained within the rod
-    expect(d.slotWidth).toBeLessThan(d.rodDiameter)
-    expect(d.slotHeight).toBeLessThan(d.rodDiameter)
-
-    // Splint is sized to slide through slot with slip-fit clearance
-    expect(d.splintWidth).toBeLessThan(d.slotWidth)
-    expect(d.splintThickness).toBeLessThan(d.slotHeight)
-    expect(d.slotWidth - d.splintWidth).toBeCloseTo(0.25, 2)
-    expect(d.slotHeight - d.splintThickness).toBeCloseTo(0.25, 2)
-
-    // Total T-rod length extends through both holes with room for slot and tip
+    // Total T-rod length extends through both holes with room for male thread stud
     expect(d.tRodTotalLength).toBeGreaterThan(d.span)
   })
 
-  it('generates non-empty binary STL for T-mount (both parts, T-rod, and splint)', () => {
+  it('generates non-empty binary STL for T-mount (both parts, T-rod, and female crossbar)', () => {
     const opts: TubeMountSTLOptions = {
       tubeOuterDiameter_mm: 25,
       tubeWallThickness_mm: 1.2,
@@ -316,7 +307,7 @@ describe('stlExport: internal tube mount 3D mesh generation', () => {
       mountType: 'tmount',
     }
 
-    for (const part of ['both', 'trod', 'splint'] as const) {
+    for (const part of ['both', 'trod', 'crossbar', 'splint'] as const) {
       const bytes = generateTubeMountSTL({ ...opts, part })
       expect(bytes.byteLength).toBeGreaterThan(1000)
       const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength)

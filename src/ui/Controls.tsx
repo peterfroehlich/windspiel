@@ -1253,7 +1253,7 @@ function ManufacturingTab({
   const [mountType, setMountType] = useState<'threaded' | 'tmount'>('threaded')
   const [mountTubeHoleMm, setMountTubeHoleMm] = useState('4.5')
   const [mountCordHoleMm, setMountCordHoleMm] = useState('2.0')
-  const [mountPart, setMountPart] = useState<'both' | 'male' | 'female' | 'trod' | 'splint'>('both')
+  const [mountPart, setMountPart] = useState<'both' | 'male' | 'female' | 'trod' | 'crossbar' | 'splint'>('both')
   const [mountStlExported, setMountStlExported] = useState(false)
 
   const trackerRef = useRef<AudioPitchTracker | null>(null)
@@ -2089,9 +2089,9 @@ function ManufacturingTab({
                   setMountType('tmount')
                   setMountPart('both')
                 }}
-                title="T-shaped rod inserted through both holes and locked with a matching splint (H-shape)"
+                title="T-shaped rod with male thread on the end and matching female threaded crossbar (H-shape)"
               >
-                T-Rod &amp; Splint (H-Shape)
+                T-Rod &amp; Crossbar (H-Shape)
               </button>
             </div>
           </div>
@@ -2162,9 +2162,9 @@ function ManufacturingTab({
                   <strong>{mfgTubeMountDims.crossbarLength.toFixed(1)} mm</strong>
                 </div>
                 <div className="mfg-striker-prop">
-                  <span className="mfg-prop-label">Splint pin:</span>
-                  <strong>{mfgTubeMountDims.splintLength.toFixed(1)} mm</strong>
-                  <span className="mfg-prop-sub">(same length = H-shape)</span>
+                  <span className="mfg-prop-label">Retaining Bar:</span>
+                  <strong>{mfgTubeMountDims.crossbarLength.toFixed(1)} mm</strong>
+                  <span className="mfg-prop-sub">(matching dimensions = H-shape)</span>
                 </div>
                 <div className="mfg-striker-prop">
                   <span className="mfg-prop-label">Center cord hole:</span>
@@ -2172,9 +2172,9 @@ function ManufacturingTab({
                   <span className="mfg-prop-sub">(exact middle of tube span)</span>
                 </div>
                 <div className="mfg-striker-prop" style={{ gridColumn: 'span 2' }}>
-                  <span className="mfg-prop-label">Splint slot:</span>
-                  <strong>{mfgTubeMountDims.slotWidth.toFixed(1)} × {mfgTubeMountDims.slotHeight.toFixed(1)} mm</strong>
-                  <span className="mfg-prop-sub">(0.25mm slip-fit clearance, rod length {mfgTubeMountDims.tRodTotalLength.toFixed(1)} mm)</span>
+                  <span className="mfg-prop-label">Thread:</span>
+                  <strong>M{mfgTubeMountDims.tThreadMajorDia.toFixed(1)} × {mfgTubeMountDims.tThreadPitch.toFixed(2)} mm</strong>
+                  <span className="mfg-prop-sub">({mfgTubeMountDims.tThreadLength.toFixed(1)} mm stud &amp; female socket, 0.25mm tolerance)</span>
                 </div>
               </>
             )}
@@ -2217,17 +2217,17 @@ function ManufacturingTab({
                     type="button"
                     className={`mfg-part-pill ${mountPart === 'trod' ? 'active' : ''}`}
                     onClick={() => setMountPart('trod')}
-                    title="T-Rod: T-shaped pin with upper crossbar, center cord hole, and splint slot"
+                    title="T-Rod: T-shaped pin with upper crossbar, center cord hole, and male thread stud"
                   >
-                    T-Rod
+                    T-Rod (Male)
                   </button>
                   <button
                     type="button"
-                    className={`mfg-part-pill ${mountPart === 'splint' ? 'active' : ''}`}
-                    onClick={() => setMountPart('splint')}
-                    title="Splint: Retaining pin that locks through the long end of the T-Rod"
+                    className={`mfg-part-pill ${mountPart === 'crossbar' ? 'active' : ''}`}
+                    onClick={() => setMountPart('crossbar')}
+                    title="Crossbar: Retaining rod with matching dimensions and central female thread"
                   >
-                    Splint
+                    Crossbar (Female)
                   </button>
                 </>
               )}
@@ -2242,15 +2242,15 @@ function ManufacturingTab({
               title={`Download 3D printable binary STL for Tube #${activeIdx + 1}: ${
                 mountType === 'threaded'
                   ? mountPart === 'both' ? 'Both Parts' : mountPart === 'male' ? 'Part A (Male)' : 'Part B (Female)'
-                  : mountPart === 'both' ? 'Both Parts' : mountPart === 'trod' ? 'T-Rod' : 'Splint'
+                  : mountPart === 'both' ? 'Both Parts' : mountPart === 'trod' ? 'T-Rod (Male)' : 'Crossbar (Female)'
               }`}
             >
-              {mountStlExported ? '✓ STL Downloaded!' : `💾 Download ${mountType === 'threaded' ? 'Threaded Mount' : 'T-Mount & Splint'} STL`}
+              {mountStlExported ? '✓ STL Downloaded!' : `💾 Download ${mountType === 'threaded' ? 'Threaded Mount' : 'T-Mount & Crossbar'} STL`}
             </button>
             <div className="mfg-striker-hint">
               {mountType === 'threaded'
                 ? 'A two-part rod connected with a thread with a hole for a hanging thread in the exact middle, with slightly raised edges so it does not fall out. Insert Part A and Part B from opposite sides through the drilled tube holes and screw together inside.'
-                : 'A T-shaped rod inserted fully through both holes and fixed in place with a splint. The splint and the upper crossbar of the T have the exact same length so the assembled mount forms a symmetric H with hanging cord in the middle.'}
+                : 'A T-shaped rod inserted fully through both holes with a male thread on the end, fastened with a matching female threaded crossbar of identical outer dimensions. When tightened, both crossbars form a symmetric H with hanging cord in the middle.'}
             </div>
           </div>
         </div>
