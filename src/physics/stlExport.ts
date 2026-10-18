@@ -1185,7 +1185,8 @@ export function downloadTubeMountSTL(options: TubeMountSTLOptions): void {
   const odStr = d.tubeOD.toFixed(0)
   const holeStr = d.tubeHoleDia.toFixed(1)
   const prefix = isTMount ? 'windspiel-t-mount' : 'windspiel-internal-mount'
-  const filename = `${prefix}-${tubeStr}OD${odStr}mm-hole${holeStr}mm-${partName}.stl`
+  const hStr = isTMount ? `-H${d.crossbarHeight.toFixed(1)}mm` : ''
+  const filename = `${prefix}-${tubeStr}OD${odStr}mm-hole${holeStr}mm${hStr}-${partName}.stl`
 
   triggerFileDownload(bytes, filename)
 }

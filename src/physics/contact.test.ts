@@ -394,6 +394,30 @@ describe('stlExport: internal tube mount 3D mesh generation', () => {
     expect(inconsistentOrientation).toBe(0)
   })
 
+  it('updates female crossbar thickness dynamically with Crossbar H', () => {
+    const testHeights = [1.5, 2.0, 3.2, 4.0, 5.5]
+    for (const h of testHeights) {
+      const opts: TubeMountSTLOptions = {
+        tubeOuterDiameter_mm: 18,
+        tubeHoleDiameter_mm: 4.0,
+        crossbarHeight_mm: h,
+        mountType: 'tmount',
+      }
+      const d = calculateTubeMountDimensions(opts)
+      expect(d.crossbarHeight).toBeCloseTo(h, 2)
+
+      const geoFemale = buildFemaleCrossbarGeometry(opts)
+      geoFemale.computeBoundingBox()
+      const box = geoFemale.boundingBox!
+      const femaleThickness = box.max.z - box.min.z
+      expect(femaleThickness).toBeCloseTo(h, 2)
+
+      // Verify that filename includes the configured height
+      const hStr = `-H${d.crossbarHeight.toFixed(1)}mm`
+      expect(hStr).toBe(`-H${h.toFixed(1)}mm`)
+    }
+  })
+
   it('generates non-empty binary STL for T-mount (both parts, T-rod, and female crossbar)', () => {
     const opts: TubeMountSTLOptions = {
       tubeOuterDiameter_mm: 25,
@@ -412,3 +436,4 @@ describe('stlExport: internal tube mount 3D mesh generation', () => {
     }
   })
 })
+

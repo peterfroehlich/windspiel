@@ -1461,9 +1461,9 @@ function ManufacturingTab({
 
   // Internal Tube Mount calculations & download handler
   const activeSusp = tubeSuspension(config, tubes, activeIdx)
-  const parsedMountHole = parseFloat(mountTubeHoleMm) > 0 ? parseFloat(mountTubeHoleMm) : 4.0
-  const parsedMountCord = parseFloat(mountCordHoleMm) > 0 ? parseFloat(mountCordHoleMm) : 1.5
-  const parsedCrossbarH = parseFloat(mountCrossbarHeightMm) > 0 ? parseFloat(mountCrossbarHeightMm) : 2.0
+  const parsedMountHole = parseFloat(String(mountTubeHoleMm).replace(',', '.')) > 0 ? parseFloat(String(mountTubeHoleMm).replace(',', '.')) : 4.0
+  const parsedMountCord = parseFloat(String(mountCordHoleMm).replace(',', '.')) > 0 ? parseFloat(String(mountCordHoleMm).replace(',', '.')) : 1.5
+  const parsedCrossbarH = parseFloat(String(mountCrossbarHeightMm).replace(',', '.')) > 0 ? parseFloat(String(mountCrossbarHeightMm).replace(',', '.')) : 2.0
   const mfgTubeMountDims = calculateTubeMountDimensions({
     tubeOuterDiameter_mm: activeGeom.Do * 1000,
     tubeWallThickness_mm: activeGeom.solid ? 2.0 : activeGeom.t * 1000,
@@ -2069,7 +2069,7 @@ function ManufacturingTab({
               <span>🖨️ Internal Tube Mount (STL)</span>
             </div>
             <span className="mfg-striker-badge">
-              {mountType === 'threaded' ? 'Center Mount • 2-Part Threaded' : 'Center Mount • T-Pin & Splint (H-Shape)'}
+              {mountType === 'threaded' ? 'Center Mount • 2-Part Threaded' : 'Center Mount • T-Rod & Crossbar (H-Shape)'}
             </span>
           </div>
 
@@ -2180,18 +2180,19 @@ function ManufacturingTab({
             ) : (
               <>
                 <div className="mfg-striker-prop">
-                  <span className="mfg-prop-label">T Crossbar:</span>
-                  <strong>{mfgTubeMountDims.crossbarLength.toFixed(1)} mm</strong>
+                  <span className="mfg-prop-label">T-Crossbar (Male):</span>
+                  <strong>{mfgTubeMountDims.crossbarLength.toFixed(1)} × {mfgTubeMountDims.crossbarWidth.toFixed(1)} × {mfgTubeMountDims.crossbarHeight.toFixed(1)} mm</strong>
+                  <span className="mfg-prop-sub">(L × W × H, thickness {mfgTubeMountDims.crossbarHeight.toFixed(1)} mm)</span>
                 </div>
                 <div className="mfg-striker-prop">
-                  <span className="mfg-prop-label">Retaining Bar:</span>
-                  <strong>{mfgTubeMountDims.crossbarLength.toFixed(1)} mm</strong>
-                  <span className="mfg-prop-sub">(matching dimensions = H-shape)</span>
+                  <span className="mfg-prop-label">Retaining Bar (Female):</span>
+                  <strong>{mfgTubeMountDims.crossbarLength.toFixed(1)} × {mfgTubeMountDims.crossbarWidth.toFixed(1)} × {mfgTubeMountDims.crossbarHeight.toFixed(1)} mm</strong>
+                  <span className="mfg-prop-sub">(matching thickness {mfgTubeMountDims.crossbarHeight.toFixed(1)} mm = H-shape)</span>
                 </div>
                 <div className="mfg-striker-prop" style={{ gridColumn: 'span 2' }}>
-                  <span className="mfg-prop-label">Crossbar Profile:</span>
-                  <strong>{mfgTubeMountDims.crossbarWidth.toFixed(1)} × {mfgTubeMountDims.crossbarHeight.toFixed(1)} mm</strong>
-                  <span className="mfg-prop-sub">(width matches bar Ø {mfgTubeMountDims.rodDiameter.toFixed(1)} mm, height {mfgTubeMountDims.crossbarHeight.toFixed(1)} mm)</span>
+                  <span className="mfg-prop-label">Crossbars Profile:</span>
+                  <strong>{mfgTubeMountDims.crossbarWidth.toFixed(1)} mm wide × {mfgTubeMountDims.crossbarHeight.toFixed(1)} mm thick</strong>
+                  <span className="mfg-prop-sub">(both male &amp; female crossbars have identical thickness {mfgTubeMountDims.crossbarHeight.toFixed(1)} mm)</span>
                 </div>
                 <div className="mfg-striker-prop">
                   <span className="mfg-prop-label">Center cord hole:</span>
@@ -2272,7 +2273,19 @@ function ManufacturingTab({
                   : mountPart === 'both' ? 'Both Parts' : mountPart === 'trod' ? 'T-Rod (Male)' : 'Crossbar (Female)'
               }`}
             >
-              {mountStlExported ? '✓ STL Downloaded!' : `💾 Download ${mountType === 'threaded' ? 'Threaded Mount' : 'T-Mount & Crossbar'} STL`}
+              {mountStlExported
+                ? '✓ STL Downloaded!'
+                : mountType === 'threaded'
+                  ? mountPart === 'both'
+                    ? '💾 Download Threaded Mount (Both Parts) STL'
+                    : mountPart === 'male'
+                      ? '💾 Download Part A (Male) STL'
+                      : '💾 Download Part B (Female) STL'
+                  : mountPart === 'both'
+                    ? '💾 Download T-Mount & Crossbar (Both Parts) STL'
+                    : mountPart === 'trod'
+                      ? '💾 Download T-Rod (Male) STL'
+                      : `💾 Download Female Crossbar (H=${mfgTubeMountDims.crossbarHeight.toFixed(1)}mm) STL`}
             </button>
             <div className="mfg-striker-hint">
               {mountType === 'threaded'
