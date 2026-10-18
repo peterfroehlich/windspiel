@@ -769,31 +769,130 @@ export function buildTubeMountCombinedGeometry(options: TubeMountSTLOptions): TH
 /**
  * Builds the solid crossbar body of length L, width W, height H.
  * With rounded ends and beveled perimeter edges.
+ * If holeR > 0, an open cylindrical through-hole of radius holeR is formed at (0, 0) along Z.
  */
-function buildCrossbarBody(length: number, width: number, height: number): THREE.BufferGeometry {
+function buildCrossbarBody(length: number, width: number, height: number, holeR = 0): THREE.BufferGeometry {
+  const bevel = 0.35
   const shape = new THREE.Shape()
-  const rad = Math.min(width, height) * 0.35
-  shape.moveTo(-width / 2 + rad, -height / 2)
-  shape.lineTo(width / 2 - rad, -height / 2)
-  shape.quadraticCurveTo(width / 2, -height / 2, width / 2, -height / 2 + rad)
-  shape.lineTo(width / 2, height / 2 - rad)
-  shape.quadraticCurveTo(width / 2, height / 2, width / 2 - rad, height / 2)
-  shape.lineTo(-width / 2 + rad, height / 2)
-  shape.quadraticCurveTo(-width / 2, height / 2, -width / 2, height / 2 - rad)
-  shape.lineTo(-width / 2, -height / 2 + rad)
-  shape.quadraticCurveTo(-width / 2, -height / 2, -width / 2 + rad, -height / 2)
+  const rad = Math.min(width, length) * 0.35
+  const halfW = width / 2
+  const halfL = length / 2
+
+  shape.moveTo(-halfW + rad, -halfL)
+  shape.lineTo(halfW - rad, -halfL)
+  shape.quadraticCurveTo(halfW, -halfL, halfW, -halfL + rad)
+  shape.lineTo(halfW, halfL - rad)
+  shape.quadraticCurveTo(halfW, halfL, halfW - rad, halfL)
+  shape.lineTo(-halfW + rad, halfL)
+  shape.quadraticCurveTo(-halfW, halfL, -halfW, halfL - rad)
+  shape.lineTo(-halfW, -halfL + rad)
+  shape.quadraticCurveTo(-halfW, -halfL, -halfW + rad, -halfL)
+
+  if (holeR > 0) {
+    const hole = new THREE.Path()
+    hole.absarc(0, 0, holeR, 0, Math.PI * 2, true)
+    shape.holes.push(hole)
+  }
 
   const geo = new THREE.ExtrudeGeometry(shape, {
-    depth: length,
+    depth: height,
     bevelEnabled: true,
     bevelSegments: 3,
     steps: 1,
-    bevelSize: 0.35,
-    bevelThickness: 0.35,
+    bevelSize: bevel,
+    bevelThickness: bevel,
   })
-  geo.translate(0, 0, -length / 2)
-  geo.rotateX(Math.PI / 2)
-  geo.translate(0, 0, height / 2 + 0.35)
+  geo.translate(0, 0, bevel)
+  return geo
+}
+
+/**
+ * Builds the continuous female thread walls inside a cylindrical through-hole.
+ * At z = 0 and z = totalHeight, annular rims connect the thread to the hole opening.
+ */
+function buildFemaleThreadInHole(
+  majorR: number,
+  minorR: number,
+  clearance: number,
+  pitch: number,
+  totalHeight: number,
+  radialSteps = 36,
+  heightSteps = 80
+): THREE.BufferGeometry {
+  const effMajorR = majorR + clearance
+  const effMinorR = minorR + clearance
+  const depth = effMajorR - effMinorR
+
+  const pos: number[] = []
+  const indices: number[] = []
+
+  function getInnerRadius(z: number, theta: number): number {
+    const frac = ((z / pitch) - (theta / (2 * Math.PI))) % 1.0
+    const phi = (frac + 1.0) % 1.0
+    const profile = 0.5 * (1.0 + Math.cos(2 * Math.PI * (phi - 0.5)))
+    let r = effMinorR + depth * (1.0 - profile)
+
+    const leadIn = pitch * 0.5
+    if (z > totalHeight - leadIn) {
+      const t = (totalHeight - z) / leadIn
+      r = Math.max(r, effMajorR + 0.15 * (1.0 - t))
+    }
+    if (z < leadIn) {
+      const t = z / leadIn
+      r = Math.max(r, effMajorR + 0.15 * (1.0 - t))
+    }
+    return r
+  }
+
+  for (let k = 0; k <= heightSteps; k++) {
+    const z = (k / heightSteps) * totalHeight
+    for (let j = 0; j < radialSteps; j++) {
+      const theta = (j / radialSteps) * Math.PI * 2
+      const r = getInnerRadius(z, theta)
+      pos.push(r * Math.cos(theta), r * Math.sin(theta), z)
+    }
+  }
+
+  for (let k = 0; k < heightSteps; k++) {
+    for (let j = 0; j < radialSteps; j++) {
+      const nextJ = (j + 1) % radialSteps
+      const i0 = k * radialSteps + j
+      const i1 = k * radialSteps + nextJ
+      const i2 = (k + 1) * radialSteps + nextJ
+      const i3 = (k + 1) * radialSteps + j
+      indices.push(i0, i2, i1)
+      indices.push(i0, i3, i2)
+    }
+  }
+
+  const botInnerStart = 0
+  const botOuterStart = pos.length / 3
+  for (let j = 0; j < radialSteps; j++) {
+    const theta = (j / radialSteps) * Math.PI * 2
+    pos.push(effMajorR * Math.cos(theta), effMajorR * Math.sin(theta), 0)
+  }
+  for (let j = 0; j < radialSteps; j++) {
+    const nextJ = (j + 1) % radialSteps
+    indices.push(botInnerStart + j, botInnerStart + nextJ, botOuterStart + j)
+    indices.push(botInnerStart + nextJ, botOuterStart + nextJ, botOuterStart + j)
+  }
+
+  const topInnerStart = heightSteps * radialSteps
+  const topOuterStart = pos.length / 3
+  for (let j = 0; j < radialSteps; j++) {
+    const theta = (j / radialSteps) * Math.PI * 2
+    pos.push(effMajorR * Math.cos(theta), effMajorR * Math.sin(theta), totalHeight)
+  }
+  for (let j = 0; j < radialSteps; j++) {
+    const nextJ = (j + 1) % radialSteps
+    indices.push(topInnerStart + j, topOuterStart + j, topInnerStart + nextJ)
+    indices.push(topInnerStart + nextJ, topOuterStart + j, topOuterStart + nextJ)
+  }
+
+  const geo = new THREE.BufferGeometry()
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3))
+  geo.setIndex(indices)
+  geo.computeVertexNormals()
   return geo
 }
 
@@ -804,13 +903,15 @@ export function buildTRodGeometry(options: TubeMountSTLOptions): THREE.BufferGeo
   const d = calculateTubeMountDimensions(options)
   const rRod = d.rodDiameter / 2
   const parts: THREE.BufferGeometry[] = []
+  const bevel = 0.35
+  const totalBarH = d.crossbarHeight + 2 * bevel
 
-  // 1. Crossbar (Upper part of T)
-  const crossbarGeo = buildCrossbarBody(d.crossbarLength, d.crossbarWidth, d.crossbarHeight)
+  // 1. Crossbar (Upper part of T) - Solid continuous rounded bar
+  const crossbarGeo = buildCrossbarBody(d.crossbarLength, d.crossbarWidth, d.crossbarHeight, 0)
   parts.push(crossbarGeo)
 
   // 2. Stem starting from bottom of crossbar
-  const zStemBase = d.crossbarHeight + 0.7
+  const zStemBase = totalBarH
   const zHole = zStemBase + d.span / 2
   const rHole = Math.min(d.cordHoleDia / 2, rRod * 0.7)
 
@@ -839,10 +940,10 @@ export function buildTRodGeometry(options: TubeMountSTLOptions): THREE.BufferGeo
   }
 
   // 3. Male thread stud extending past the shoulder
-  const threadMajorDia = Math.max(2.4, Math.min(d.rodDiameter - 1.0, 3.2))
-  const threadMinorDia = Math.max(1.7, threadMajorDia - 0.9)
-  const pitch = 1.25
-  const threadLength = 4.5
+  const threadMajorDia = d.tThreadMajorDia
+  const threadMinorDia = d.tThreadMinorDia
+  const pitch = d.tThreadPitch
+  const threadLength = d.tThreadLength
 
   const maleThread = buildParametricMaleThread(
     threadMajorDia / 2,
@@ -866,86 +967,33 @@ export function buildTRodGeometry(options: TubeMountSTLOptions): THREE.BufferGeo
 
 /**
  * Generate 3D geometry for the Female Crossbar Rod.
- * It has the exact same dimensions as the short, upper part of the T, with a matching female thread socket at the middle.
+ * It has the exact same dimensions as the short, upper part of the T, with a matching female thread socket in the middle.
  */
 export function buildFemaleCrossbarGeometry(options: TubeMountSTLOptions): THREE.BufferGeometry {
   const d = calculateTubeMountDimensions(options)
-  const threadMajorDia = Math.max(2.4, Math.min(d.rodDiameter - 1.0, 3.2))
-  const threadMinorDia = Math.max(1.7, threadMajorDia - 0.9)
-  const pitch = 1.25
-  const threadLength = 4.5
+  const threadMajorDia = d.tThreadMajorDia
+  const threadMinorDia = d.tThreadMinorDia
+  const pitch = d.tThreadPitch
   const clearance = 0.25
+  const effMajorR = (threadMajorDia / 2) + clearance
+  const bevel = 0.35
+  const totalBarH = d.crossbarHeight + 2 * bevel
 
-  const totalBodyHeight = d.crossbarHeight + 0.7
-  const socketDepth = threadLength + 0.6 // 0.6mm deeper so it seats flush on shoulder
+  // 1. Continuous crossbar body with open cylindrical hole in center
+  const bodyGeo = buildCrossbarBody(d.crossbarLength, d.crossbarWidth, d.crossbarHeight, effMajorR)
 
-  const socketMajorR = (threadMajorDia / 2) + clearance
-  const centerR = Math.max(socketMajorR + 0.8, (d.rodDiameter / 2) + 0.2)
-  const armLen = (d.crossbarLength / 2) - centerR
-
-  const leftShape = new THREE.Shape()
-  const rad = Math.min(d.crossbarWidth, d.crossbarHeight) * 0.35
-  leftShape.moveTo(-d.crossbarWidth / 2 + rad, -d.crossbarHeight / 2)
-  leftShape.lineTo(d.crossbarWidth / 2 - rad, -d.crossbarHeight / 2)
-  leftShape.quadraticCurveTo(d.crossbarWidth / 2, -d.crossbarHeight / 2, d.crossbarWidth / 2, -d.crossbarHeight / 2 + rad)
-  leftShape.lineTo(d.crossbarWidth / 2, d.crossbarHeight / 2 - rad)
-  leftShape.quadraticCurveTo(d.crossbarWidth / 2, d.crossbarHeight / 2, d.crossbarWidth / 2 - rad, d.crossbarHeight / 2)
-  leftShape.lineTo(-d.crossbarWidth / 2 + rad, d.crossbarHeight / 2)
-  leftShape.quadraticCurveTo(-d.crossbarWidth / 2, d.crossbarHeight / 2, -d.crossbarWidth / 2, d.crossbarHeight / 2 - rad)
-  leftShape.lineTo(-d.crossbarWidth / 2, -d.crossbarHeight / 2 + rad)
-  leftShape.quadraticCurveTo(-d.crossbarWidth / 2, -d.crossbarHeight / 2, -d.crossbarWidth / 2 + rad, -d.crossbarHeight / 2)
-
-  const parts: THREE.BufferGeometry[] = []
-
-  // Left arm
-  const leftGeo = new THREE.ExtrudeGeometry(leftShape, {
-    depth: armLen,
-    bevelEnabled: true,
-    bevelSegments: 3,
-    steps: 1,
-    bevelSize: 0.35,
-    bevelThickness: 0.35,
-  })
-  leftGeo.translate(0, 0, -armLen / 2)
-  leftGeo.rotateX(Math.PI / 2)
-  leftGeo.translate(0, -(centerR + armLen / 2), d.crossbarHeight / 2 + 0.35)
-  parts.push(leftGeo)
-
-  // Right arm
-  const rightGeo = new THREE.ExtrudeGeometry(leftShape, {
-    depth: armLen,
-    bevelEnabled: true,
-    bevelSegments: 3,
-    steps: 1,
-    bevelSize: 0.35,
-    bevelThickness: 0.35,
-  })
-  rightGeo.translate(0, 0, -armLen / 2)
-  rightGeo.rotateX(Math.PI / 2)
-  rightGeo.translate(0, +(centerR + armLen / 2), d.crossbarHeight / 2 + 0.35)
-  parts.push(rightGeo)
-
-  // Center collar cylinder connecting the arms
-  const collarGeo = new THREE.CylinderGeometry(centerR, centerR, totalBodyHeight, 32)
-  collarGeo.rotateX(Math.PI / 2)
-  collarGeo.translate(0, 0, totalBodyHeight / 2)
-  parts.push(collarGeo)
-
-  // Center female thread socket
-  const socketGeo = buildParametricFemaleThreadSocket(
+  // 2. Internal female helical thread inside the hole
+  const threadGeo = buildFemaleThreadInHole(
     threadMajorDia / 2,
     threadMinorDia / 2,
     clearance,
     pitch,
-    totalBodyHeight,
-    socketDepth,
+    totalBarH,
     36,
     80
   )
-  parts.push(socketGeo)
 
-  const normalized = parts.map(normalizeGeo)
-  const merged = BufferGeometryUtils.mergeGeometries(normalized, false)
+  const merged = BufferGeometryUtils.mergeGeometries([normalizeGeo(bodyGeo), normalizeGeo(threadGeo)], false)
   if (!merged) {
     throw new Error('Failed to merge Female Crossbar geometries')
   }
