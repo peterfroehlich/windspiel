@@ -173,7 +173,8 @@ export interface TubeMountSTLOptions {
   tubeHoleDiameter_mm?: number
   cordHoleDiameter_mm?: number
   threadClearance_mm?: number
-  part?: 'both' | 'male' | 'female'
+  part?: 'both' | 'male' | 'female' | 'trod' | 'splint'
+  mountType?: 'threaded' | 'tmount'
   tubeIndex?: number
 }
 
@@ -197,6 +198,17 @@ export interface TubeMountDimensions {
   pitch: number
   threadLength: number
   totalAssembledLength: number
+
+  // T-Mount specific dimensions
+  crossbarLength: number
+  crossbarWidth: number
+  crossbarHeight: number
+  slotWidth: number
+  slotHeight: number
+  splintLength: number
+  splintWidth: number
+  splintThickness: number
+  tRodTotalLength: number
 }
 
 /**
@@ -236,6 +248,19 @@ export function calculateTubeMountDimensions(options: TubeMountSTLOptions): Tube
   const pitch = 1.25
   const threadLength = Math.min(8.0, Math.max(3.5, shaftLengthB - 1.5))
 
+  // T-Mount specific calculations:
+  // Upper part of the T (crossbar) and Splint have the exact same length forming an "H"
+  const crossbarLength = Math.max(14, Math.round(tubeHoleDia * 3.2))
+  const crossbarHeight = Math.max(2.0, rodDiameter * 0.75)
+  const crossbarWidth = rodDiameter
+  const slotWidth = Math.max(1.3, Math.min(2.5, rodDiameter * 0.52))
+  const slotHeight = Math.max(1.6, Math.min(2.6, rodDiameter * 0.55))
+  const splintLength = crossbarLength
+  const splintWidth = slotWidth - 0.25
+  const splintThickness = slotHeight - 0.25
+  const tipLen = Math.max(2.0, rodDiameter * 0.6)
+  const tRodTotalLength = crossbarHeight + span + 0.3 + slotHeight + tipLen + (rodDiameter / 2) * 0.7
+
   return {
     tubeOD,
     wall,
@@ -256,6 +281,15 @@ export function calculateTubeMountDimensions(options: TubeMountSTLOptions): Tube
     pitch,
     threadLength,
     totalAssembledLength: span + 2 * flangeThickness,
+    crossbarLength,
+    crossbarWidth,
+    crossbarHeight,
+    slotWidth,
+    slotHeight,
+    splintLength,
+    splintWidth,
+    splintThickness,
+    tRodTotalLength,
   }
 }
 
@@ -727,9 +761,198 @@ export function buildTubeMountCombinedGeometry(options: TubeMountSTLOptions): TH
 }
 
 /**
- * Resolve the requested tube mount geometry: both parts, Part A (male), or Part B (female).
+ * Generate 3D geometry for the T-Rod (T-shaped pin with upper crossbar, center cord hole, and splint slot).
+ */
+export function buildTRodGeometry(options: TubeMountSTLOptions): THREE.BufferGeometry {
+  const d = calculateTubeMountDimensions(options)
+  const rRod = d.rodDiameter / 2
+  const parts: THREE.BufferGeometry[] = []
+
+  // 1. Crossbar (Upper part of T)
+  // Stands at Z in [0, crossbarHeight + 0.6] with flat base on Z=0
+  // Symmetrically centered along Y: from -crossbarLength / 2 to +crossbarLength / 2
+  const crossbarShape = new THREE.Shape()
+  const rad = Math.min(d.crossbarWidth, d.crossbarHeight) * 0.25
+  crossbarShape.moveTo(-d.crossbarWidth / 2 + rad, -d.crossbarHeight / 2)
+  crossbarShape.lineTo(d.crossbarWidth / 2 - rad, -d.crossbarHeight / 2)
+  crossbarShape.quadraticCurveTo(d.crossbarWidth / 2, -d.crossbarHeight / 2, d.crossbarWidth / 2, -d.crossbarHeight / 2 + rad)
+  crossbarShape.lineTo(d.crossbarWidth / 2, d.crossbarHeight / 2 - rad)
+  crossbarShape.quadraticCurveTo(d.crossbarWidth / 2, d.crossbarHeight / 2, d.crossbarWidth / 2 - rad, d.crossbarHeight / 2)
+  crossbarShape.lineTo(-d.crossbarWidth / 2 + rad, d.crossbarHeight / 2)
+  crossbarShape.quadraticCurveTo(-d.crossbarWidth / 2, d.crossbarHeight / 2, -d.crossbarWidth / 2, d.crossbarHeight / 2 - rad)
+  crossbarShape.lineTo(-d.crossbarWidth / 2, -d.crossbarHeight / 2 + rad)
+  crossbarShape.quadraticCurveTo(-d.crossbarWidth / 2, -d.crossbarHeight / 2, -d.crossbarWidth / 2 + rad, -d.crossbarHeight / 2)
+
+  const crossbarGeo = new THREE.ExtrudeGeometry(crossbarShape, {
+    depth: d.crossbarLength,
+    bevelEnabled: true,
+    bevelSegments: 3,
+    steps: 1,
+    bevelSize: 0.3,
+    bevelThickness: 0.3,
+  })
+  // Center along Z so when rotated it's centered along Y:
+  crossbarGeo.translate(0, 0, -d.crossbarLength / 2)
+  crossbarGeo.rotateX(Math.PI / 2)
+  crossbarGeo.translate(0, 0, d.crossbarHeight / 2 + 0.3)
+  parts.push(crossbarGeo)
+
+  // 2. Stem starting from bottom of crossbar
+  const zStemBase = d.crossbarHeight + 0.6
+  const zHole = zStemBase + d.span / 2
+  const rHole = Math.min(d.cordHoleDia / 2, rRod * 0.7)
+
+  // Shaft lower section (from crossbar to cord hole)
+  const lenLower = (zHole - rHole) - zStemBase
+  if (lenLower > 0) {
+    const shaftLower = new THREE.CylinderGeometry(rRod, rRod, lenLower, 32)
+    shaftLower.rotateX(Math.PI / 2)
+    shaftLower.translate(0, 0, zStemBase + lenLower / 2)
+    parts.push(shaftLower)
+  }
+
+  // Cord hole pillars (exact round circular cylinder)
+  const pillar1 = buildRoundHolePillar(rRod, rHole, zHole, true, 32, 24)
+  const pillar2 = buildRoundHolePillar(rRod, rHole, zHole, false, 32, 24)
+  parts.push(pillar1, pillar2)
+
+  // Shaft middle section (from cord hole to splint slot)
+  const zSlotStart = zStemBase + d.span + 0.3
+  const lenMid = zSlotStart - (zHole + rHole)
+  if (lenMid > 0) {
+    const shaftMid = new THREE.CylinderGeometry(rRod, rRod, lenMid, 32)
+    shaftMid.rotateX(Math.PI / 2)
+    shaftMid.translate(0, 0, (zHole + rHole) + lenMid / 2)
+    parts.push(shaftMid)
+  }
+
+  // Splint slot section: slot passes through along Y
+  // Solid pillars on +X and -X sides
+  const halfSlotW = d.slotWidth / 2
+  const yEdge = Math.sqrt(Math.max(0, rRod * rRod - halfSlotW * halfSlotW))
+  const aMax = Math.acos(Math.min(1, halfSlotW / rRod))
+  const aMin = -aMax
+
+  // +X pillar
+  const shapePX = new THREE.Shape()
+  shapePX.moveTo(halfSlotW, -yEdge)
+  shapePX.absarc(0, 0, rRod, aMin, aMax, false)
+  shapePX.lineTo(halfSlotW, yEdge)
+  shapePX.lineTo(halfSlotW, -yEdge)
+  shapePX.closePath()
+  const slotPillarPX = new THREE.ExtrudeGeometry(shapePX, { depth: d.slotHeight, bevelEnabled: false })
+  slotPillarPX.translate(0, 0, zSlotStart)
+  parts.push(slotPillarPX)
+
+  // -X pillar
+  const shapeNX = new THREE.Shape()
+  shapeNX.moveTo(-halfSlotW, yEdge)
+  shapeNX.absarc(0, 0, rRod, Math.PI - aMax, Math.PI - aMin, false)
+  shapeNX.lineTo(-halfSlotW, -yEdge)
+  shapeNX.lineTo(-halfSlotW, yEdge)
+  shapeNX.closePath()
+  const slotPillarNX = new THREE.ExtrudeGeometry(shapeNX, { depth: d.slotHeight, bevelEnabled: false })
+  slotPillarNX.translate(0, 0, zSlotStart)
+  parts.push(slotPillarNX)
+
+  // Tip section past slot
+  const tipLen = Math.max(2.0, rRod * 0.6)
+  const zTipStart = zSlotStart + d.slotHeight
+  const tipGeo = new THREE.CylinderGeometry(rRod * 0.7, rRod, tipLen, 32)
+  tipGeo.rotateX(Math.PI / 2)
+  tipGeo.translate(0, 0, zTipStart + tipLen / 2)
+  parts.push(tipGeo)
+
+  // Rounded end dome on tip
+  const dome = new THREE.SphereGeometry(rRod * 0.7, 24, 16, 0, Math.PI * 2, 0, Math.PI / 2)
+  dome.rotateX(Math.PI / 2)
+  dome.translate(0, 0, zTipStart + tipLen)
+  parts.push(dome)
+
+  const normalized = parts.map(normalizeGeo)
+  const merged = BufferGeometryUtils.mergeGeometries(normalized, false)
+  if (!merged) {
+    throw new Error('Failed to merge T-Rod geometries')
+  }
+  merged.computeVertexNormals()
+  return merged
+}
+
+/**
+ * Generate 3D geometry for the Splint (retaining pin that inserts through the slot in the T-Rod).
+ * The splint has the exact same length as the T crossbar so that the assembly forms an "H".
+ */
+export function buildSplintGeometry(options: TubeMountSTLOptions): THREE.BufferGeometry {
+  const d = calculateTubeMountDimensions(options)
+  const splintW = d.splintWidth
+  const splintH = d.splintThickness
+  const splintL = d.splintLength // Exactly equals crossbarLength!
+
+  const shape = new THREE.Shape()
+  const rad = Math.min(splintW, splintH) * 0.3
+  shape.moveTo(-splintW / 2 + rad, -splintH / 2)
+  shape.lineTo(splintW / 2 - rad, -splintH / 2)
+  shape.quadraticCurveTo(splintW / 2, -splintH / 2, splintW / 2, -splintH / 2 + rad)
+  shape.lineTo(splintW / 2, splintH / 2 - rad)
+  shape.quadraticCurveTo(splintW / 2, splintH / 2, splintW / 2 - rad, splintH / 2)
+  shape.lineTo(-splintW / 2 + rad, splintH / 2)
+  shape.quadraticCurveTo(-splintW / 2, splintH / 2, -splintW / 2, splintH / 2 - rad)
+  shape.lineTo(-splintW / 2, -splintH / 2 + rad)
+  shape.quadraticCurveTo(-splintW / 2, -splintH / 2, -splintW / 2 + rad, -splintH / 2)
+
+  const geo = new THREE.ExtrudeGeometry(shape, {
+    depth: splintL,
+    bevelEnabled: true,
+    bevelSegments: 3,
+    steps: 1,
+    bevelSize: 0.25,
+    bevelThickness: 0.25,
+  })
+
+  // Center along Z before rotation so when rotated it's centered along Y:
+  geo.translate(0, 0, -splintL / 2)
+  // Lay flat on print bed at Z = 0:
+  geo.rotateX(Math.PI / 2)
+  geo.translate(0, 0, splintH / 2 + 0.25)
+  geo.computeVertexNormals()
+  return normalizeGeo(geo)
+}
+
+/**
+ * Generate 3D geometry with both T-Rod and Splint positioned side-by-side on the print bed.
+ */
+export function buildTMountCombinedGeometry(options: TubeMountSTLOptions): THREE.BufferGeometry {
+  const d = calculateTubeMountDimensions(options)
+  const geoTRod = buildTRodGeometry(options)
+  const geoSplint = buildSplintGeometry(options)
+
+  const spacing = Math.max(16, d.crossbarWidth + d.splintWidth + 10)
+  geoTRod.translate(-spacing / 2, 0, 0)
+  geoSplint.translate(spacing / 2, 0, 0)
+
+  const combined = BufferGeometryUtils.mergeGeometries([normalizeGeo(geoTRod), normalizeGeo(geoSplint)], false)
+  if (!combined) {
+    throw new Error('Failed to merge combined T-Mount geometries')
+  }
+  combined.computeVertexNormals()
+  return combined
+}
+
+/**
+ * Resolve the requested tube mount geometry: both parts, Part A (male), Part B (female), T-Rod, or Splint.
  */
 export function buildTubeMountGeometry(options: TubeMountSTLOptions): THREE.BufferGeometry {
+  if (options.mountType === 'tmount') {
+    if (options.part === 'trod') {
+      return buildTRodGeometry(options)
+    }
+    if (options.part === 'splint') {
+      return buildSplintGeometry(options)
+    }
+    return buildTMountCombinedGeometry(options)
+  }
+
+  // Default: threaded mount
   if (options.part === 'male') {
     return buildTubeMountPartAGeometry(options)
   }
@@ -764,11 +987,13 @@ export function generateTubeMountSTL(options: TubeMountSTLOptions): Uint8Array {
 export function downloadTubeMountSTL(options: TubeMountSTLOptions): void {
   const bytes = generateTubeMountSTL(options)
   const d = calculateTubeMountDimensions(options)
+  const isTMount = options.mountType === 'tmount'
   const partName = options.part ?? 'both'
   const tubeStr = options.tubeIndex !== undefined ? `tube${options.tubeIndex + 1}-` : ''
   const odStr = d.tubeOD.toFixed(0)
   const holeStr = d.tubeHoleDia.toFixed(1)
-  const filename = `windspiel-internal-mount-${tubeStr}OD${odStr}mm-hole${holeStr}mm-${partName}.stl`
+  const prefix = isTMount ? 'windspiel-t-mount' : 'windspiel-internal-mount'
+  const filename = `${prefix}-${tubeStr}OD${odStr}mm-hole${holeStr}mm-${partName}.stl`
 
   triggerFileDownload(bytes, filename)
 }

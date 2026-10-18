@@ -278,4 +278,50 @@ describe('stlExport: internal tube mount 3D mesh generation', () => {
     expect(largeTube.flangeDiameter).toBeGreaterThan(smallTube.flangeDiameter)
     expect(largeTube.flangeDiameter).toBeGreaterThan(largeTube.tubeHoleDia)
   })
+
+  it('calculates T-mount dimensions where T crossbar and splint have equal length for an H shape', () => {
+    const opts: TubeMountSTLOptions = {
+      tubeOuterDiameter_mm: 30,
+      tubeWallThickness_mm: 1.5,
+      tubeHoleDiameter_mm: 4.5,
+      cordHoleDiameter_mm: 2.0,
+      mountType: 'tmount',
+    }
+    const d = calculateTubeMountDimensions(opts)
+
+    // Splint and upper part of T must be the same length so that the assembly looks like an H
+    expect(d.splintLength).toBe(d.crossbarLength)
+    expect(d.crossbarLength).toBeGreaterThan(d.tubeHoleDia)
+
+    // Slot is contained within the rod
+    expect(d.slotWidth).toBeLessThan(d.rodDiameter)
+    expect(d.slotHeight).toBeLessThan(d.rodDiameter)
+
+    // Splint is sized to slide through slot with slip-fit clearance
+    expect(d.splintWidth).toBeLessThan(d.slotWidth)
+    expect(d.splintThickness).toBeLessThan(d.slotHeight)
+    expect(d.slotWidth - d.splintWidth).toBeCloseTo(0.25, 2)
+    expect(d.slotHeight - d.splintThickness).toBeCloseTo(0.25, 2)
+
+    // Total T-rod length extends through both holes with room for slot and tip
+    expect(d.tRodTotalLength).toBeGreaterThan(d.span)
+  })
+
+  it('generates non-empty binary STL for T-mount (both parts, T-rod, and splint)', () => {
+    const opts: TubeMountSTLOptions = {
+      tubeOuterDiameter_mm: 25,
+      tubeWallThickness_mm: 1.2,
+      tubeHoleDiameter_mm: 4.5,
+      cordHoleDiameter_mm: 2.0,
+      mountType: 'tmount',
+    }
+
+    for (const part of ['both', 'trod', 'splint'] as const) {
+      const bytes = generateTubeMountSTL({ ...opts, part })
+      expect(bytes.byteLength).toBeGreaterThan(1000)
+      const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength)
+      const numTriangles = view.getUint32(80, true)
+      expect(numTriangles).toBeGreaterThan(50)
+    }
+  })
 })

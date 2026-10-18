@@ -1250,9 +1250,10 @@ function ManufacturingTab({
   const [tipsOpen, setTipsOpen] = useState(false)
 
   // Internal Tube Mount tool state
+  const [mountType, setMountType] = useState<'threaded' | 'tmount'>('threaded')
   const [mountTubeHoleMm, setMountTubeHoleMm] = useState('4.5')
   const [mountCordHoleMm, setMountCordHoleMm] = useState('2.0')
-  const [mountPart, setMountPart] = useState<'both' | 'male' | 'female'>('both')
+  const [mountPart, setMountPart] = useState<'both' | 'male' | 'female' | 'trod' | 'splint'>('both')
   const [mountStlExported, setMountStlExported] = useState(false)
 
   const trackerRef = useRef<AudioPitchTracker | null>(null)
@@ -1467,6 +1468,7 @@ function ManufacturingTab({
     tubeHoleDiameter_mm: parsedMountHole,
     cordHoleDiameter_mm: parsedMountCord,
     part: mountPart,
+    mountType,
     tubeIndex: activeIdx,
   })
 
@@ -1477,6 +1479,7 @@ function ManufacturingTab({
       tubeHoleDiameter_mm: parsedMountHole,
       cordHoleDiameter_mm: parsedMountCord,
       part: mountPart,
+      mountType,
       tubeIndex: activeIdx,
     })
     setMountStlExported(true)
@@ -2060,8 +2063,37 @@ function ManufacturingTab({
               <span>🖨️ Internal Tube Mount (STL)</span>
             </div>
             <span className="mfg-striker-badge">
-              Center Mount • 2-Part Rod
+              {mountType === 'threaded' ? 'Center Mount • 2-Part Threaded' : 'Center Mount • T-Pin & Splint (H-Shape)'}
             </span>
+          </div>
+
+          {/* Mount Type Selector */}
+          <div className="mfg-mount-part-selector" style={{ marginBottom: 10, paddingBottom: 6, borderBottom: '1px solid rgba(255, 255, 255, 0.06)' }}>
+            <span className="mfg-prop-label">Mount Type:</span>
+            <div className="mfg-part-pill-group">
+              <button
+                type="button"
+                className={`mfg-part-pill ${mountType === 'threaded' ? 'active' : ''}`}
+                onClick={() => {
+                  setMountType('threaded')
+                  setMountPart('both')
+                }}
+                title="Two-part rod with male thread stud and female threaded socket"
+              >
+                Two-Part Threaded
+              </button>
+              <button
+                type="button"
+                className={`mfg-part-pill ${mountType === 'tmount' ? 'active' : ''}`}
+                onClick={() => {
+                  setMountType('tmount')
+                  setMountPart('both')
+                }}
+                title="T-shaped rod inserted through both holes and locked with a matching splint (H-shape)"
+              >
+                T-Rod &amp; Splint (H-Shape)
+              </button>
+            </div>
           </div>
 
           <div className="mfg-striker-grid">
@@ -2105,20 +2137,47 @@ function ManufacturingTab({
               <span className="mfg-prop-label">Rod shaft:</span>
               <strong>Ø {mfgTubeMountDims.rodDiameter.toFixed(1)} mm</strong>
             </div>
-            <div className="mfg-striker-prop">
-              <span className="mfg-prop-label">Raised edges:</span>
-              <strong>Ø {mfgTubeMountDims.flangeDiameter.toFixed(1)} mm</strong>
-            </div>
-            <div className="mfg-striker-prop" style={{ gridColumn: 'span 2' }}>
-              <span className="mfg-prop-label">Hanging thread hole:</span>
-              <strong>{mfgTubeMountDims.cordHolePosFromFlange.toFixed(1)} mm</strong>
-              <span className="mfg-prop-sub">(exact middle between outer flanges)</span>
-            </div>
-            <div className="mfg-striker-prop" style={{ gridColumn: 'span 2' }}>
-              <span className="mfg-prop-label">Thread:</span>
-              <strong>M{mfgTubeMountDims.threadMajorDia.toFixed(1)} × {mfgTubeMountDims.pitch.toFixed(2)} mm</strong>
-              <span className="mfg-prop-sub">({mfgTubeMountDims.threadLength.toFixed(1)} mm depth, 0.25mm 3D-print tolerance)</span>
-            </div>
+
+            {mountType === 'threaded' ? (
+              <>
+                <div className="mfg-striker-prop">
+                  <span className="mfg-prop-label">Raised edges:</span>
+                  <strong>Ø {mfgTubeMountDims.flangeDiameter.toFixed(1)} mm</strong>
+                </div>
+                <div className="mfg-striker-prop" style={{ gridColumn: 'span 2' }}>
+                  <span className="mfg-prop-label">Hanging thread hole:</span>
+                  <strong>{mfgTubeMountDims.cordHolePosFromFlange.toFixed(1)} mm</strong>
+                  <span className="mfg-prop-sub">(exact middle between outer flanges)</span>
+                </div>
+                <div className="mfg-striker-prop" style={{ gridColumn: 'span 2' }}>
+                  <span className="mfg-prop-label">Thread:</span>
+                  <strong>M{mfgTubeMountDims.threadMajorDia.toFixed(1)} × {mfgTubeMountDims.pitch.toFixed(2)} mm</strong>
+                  <span className="mfg-prop-sub">({mfgTubeMountDims.threadLength.toFixed(1)} mm depth, 0.25mm 3D-print tolerance)</span>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="mfg-striker-prop">
+                  <span className="mfg-prop-label">T Crossbar:</span>
+                  <strong>{mfgTubeMountDims.crossbarLength.toFixed(1)} mm</strong>
+                </div>
+                <div className="mfg-striker-prop">
+                  <span className="mfg-prop-label">Splint pin:</span>
+                  <strong>{mfgTubeMountDims.splintLength.toFixed(1)} mm</strong>
+                  <span className="mfg-prop-sub">(same length = H-shape)</span>
+                </div>
+                <div className="mfg-striker-prop">
+                  <span className="mfg-prop-label">Center cord hole:</span>
+                  <strong>{mfgTubeMountDims.cordHolePosFromFlange.toFixed(1)} mm</strong>
+                  <span className="mfg-prop-sub">(exact middle of tube span)</span>
+                </div>
+                <div className="mfg-striker-prop" style={{ gridColumn: 'span 2' }}>
+                  <span className="mfg-prop-label">Splint slot:</span>
+                  <strong>{mfgTubeMountDims.slotWidth.toFixed(1)} × {mfgTubeMountDims.slotHeight.toFixed(1)} mm</strong>
+                  <span className="mfg-prop-sub">(0.25mm slip-fit clearance, rod length {mfgTubeMountDims.tRodTotalLength.toFixed(1)} mm)</span>
+                </div>
+              </>
+            )}
           </div>
 
           {/* Part Selection */}
@@ -2133,22 +2192,45 @@ function ManufacturingTab({
               >
                 Both Parts
               </button>
-              <button
-                type="button"
-                className={`mfg-part-pill ${mountPart === 'male' ? 'active' : ''}`}
-                onClick={() => setMountPart('male')}
-                title="Part A: Male threaded rod with central cord hole and raised edge"
-              >
-                Part A (Male)
-              </button>
-              <button
-                type="button"
-                className={`mfg-part-pill ${mountPart === 'female' ? 'active' : ''}`}
-                onClick={() => setMountPart('female')}
-                title="Part B: Female threaded rod with internal socket and raised edge"
-              >
-                Part B (Female)
-              </button>
+              {mountType === 'threaded' ? (
+                <>
+                  <button
+                    type="button"
+                    className={`mfg-part-pill ${mountPart === 'male' ? 'active' : ''}`}
+                    onClick={() => setMountPart('male')}
+                    title="Part A: Male threaded rod with central cord hole and raised edge"
+                  >
+                    Part A (Male)
+                  </button>
+                  <button
+                    type="button"
+                    className={`mfg-part-pill ${mountPart === 'female' ? 'active' : ''}`}
+                    onClick={() => setMountPart('female')}
+                    title="Part B: Female threaded rod with internal socket and raised edge"
+                  >
+                    Part B (Female)
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    className={`mfg-part-pill ${mountPart === 'trod' ? 'active' : ''}`}
+                    onClick={() => setMountPart('trod')}
+                    title="T-Rod: T-shaped pin with upper crossbar, center cord hole, and splint slot"
+                  >
+                    T-Rod
+                  </button>
+                  <button
+                    type="button"
+                    className={`mfg-part-pill ${mountPart === 'splint' ? 'active' : ''}`}
+                    onClick={() => setMountPart('splint')}
+                    title="Splint: Retaining pin that locks through the long end of the T-Rod"
+                  >
+                    Splint
+                  </button>
+                </>
+              )}
             </div>
           </div>
 
@@ -2157,12 +2239,18 @@ function ManufacturingTab({
               type="button"
               className="mfg-stl-btn"
               onClick={handleDownloadTubeMountSTL}
-              title={`Download 3D printable binary STL for Tube #${activeIdx + 1}: ${mountPart === 'both' ? 'Both Parts' : mountPart === 'male' ? 'Part A (Male)' : 'Part B (Female)'}`}
+              title={`Download 3D printable binary STL for Tube #${activeIdx + 1}: ${
+                mountType === 'threaded'
+                  ? mountPart === 'both' ? 'Both Parts' : mountPart === 'male' ? 'Part A (Male)' : 'Part B (Female)'
+                  : mountPart === 'both' ? 'Both Parts' : mountPart === 'trod' ? 'T-Rod' : 'Splint'
+              }`}
             >
-              {mountStlExported ? '✓ STL Downloaded!' : '💾 Download Internal Mount STL'}
+              {mountStlExported ? '✓ STL Downloaded!' : `💾 Download ${mountType === 'threaded' ? 'Threaded Mount' : 'T-Mount & Splint'} STL`}
             </button>
             <div className="mfg-striker-hint">
-              A two-part rod connected with a thread with a hole for a hanging thread in the exact middle, with slightly raised edges so it does not fall out. Insert Part A and Part B from opposite sides through the drilled tube holes and screw together inside.
+              {mountType === 'threaded'
+                ? 'A two-part rod connected with a thread with a hole for a hanging thread in the exact middle, with slightly raised edges so it does not fall out. Insert Part A and Part B from opposite sides through the drilled tube holes and screw together inside.'
+                : 'A T-shaped rod inserted fully through both holes and fixed in place with a splint. The splint and the upper crossbar of the T have the exact same length so the assembled mount forms a symmetric H with hanging cord in the middle.'}
             </div>
           </div>
         </div>
