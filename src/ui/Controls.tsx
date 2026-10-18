@@ -1251,8 +1251,9 @@ function ManufacturingTab({
 
   // Internal Tube Mount tool state
   const [mountType, setMountType] = useState<'threaded' | 'tmount'>('threaded')
-  const [mountTubeHoleMm, setMountTubeHoleMm] = useState('4.5')
-  const [mountCordHoleMm, setMountCordHoleMm] = useState('2.0')
+  const [mountTubeHoleMm, setMountTubeHoleMm] = useState('4.0')
+  const [mountCordHoleMm, setMountCordHoleMm] = useState('1.5')
+  const [mountCrossbarHeightMm, setMountCrossbarHeightMm] = useState('2.0')
   const [mountPart, setMountPart] = useState<'both' | 'male' | 'female' | 'trod' | 'crossbar' | 'splint'>('both')
   const [mountStlExported, setMountStlExported] = useState(false)
 
@@ -1460,13 +1461,16 @@ function ManufacturingTab({
 
   // Internal Tube Mount calculations & download handler
   const activeSusp = tubeSuspension(config, tubes, activeIdx)
-  const parsedMountHole = parseFloat(mountTubeHoleMm) > 0 ? parseFloat(mountTubeHoleMm) : 4.5
-  const parsedMountCord = parseFloat(mountCordHoleMm) > 0 ? parseFloat(mountCordHoleMm) : 2.0
+  const parsedMountHole = parseFloat(mountTubeHoleMm) > 0 ? parseFloat(mountTubeHoleMm) : 4.0
+  const parsedMountCord = parseFloat(mountCordHoleMm) > 0 ? parseFloat(mountCordHoleMm) : 1.5
+  const parsedCrossbarH = parseFloat(mountCrossbarHeightMm) > 0 ? parseFloat(mountCrossbarHeightMm) : 2.0
   const mfgTubeMountDims = calculateTubeMountDimensions({
     tubeOuterDiameter_mm: activeGeom.Do * 1000,
     tubeWallThickness_mm: activeGeom.solid ? 2.0 : activeGeom.t * 1000,
     tubeHoleDiameter_mm: parsedMountHole,
+    barDiameter_mm: parsedMountHole,
     cordHoleDiameter_mm: parsedMountCord,
+    crossbarHeight_mm: parsedCrossbarH,
     part: mountPart,
     mountType,
     tubeIndex: activeIdx,
@@ -1477,7 +1481,9 @@ function ManufacturingTab({
       tubeOuterDiameter_mm: activeGeom.Do * 1000,
       tubeWallThickness_mm: activeGeom.solid ? 2.0 : activeGeom.t * 1000,
       tubeHoleDiameter_mm: parsedMountHole,
+      barDiameter_mm: parsedMountHole,
       cordHoleDiameter_mm: parsedMountCord,
+      crossbarHeight_mm: parsedCrossbarH,
       part: mountPart,
       mountType,
       tubeIndex: activeIdx,
@@ -2106,16 +2112,16 @@ function ManufacturingTab({
               <strong>{mfgTubeMountDims.span.toFixed(1)} mm</strong>
             </div>
             <div className="mfg-striker-prop" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-              <span className="mfg-prop-label">Drilled hole:</span>
+              <span className="mfg-prop-label">{mountType === 'tmount' ? 'Bar Ø (hole):' : 'Drilled hole:'}</span>
               <input
                 type="number"
                 step="0.5"
-                min="2.5"
+                min="2.0"
                 max="10"
                 value={mountTubeHoleMm}
                 onChange={(e) => setMountTubeHoleMm(e.target.value)}
                 className="mfg-hole-input"
-                title="Drilled suspension hole diameter in tube wall in mm"
+                title="Bar diameter & drilled suspension hole diameter in tube wall in mm"
               />
               <span style={{ fontSize: 10, color: '#7b88a1' }}>mm</span>
             </div>
@@ -2123,16 +2129,32 @@ function ManufacturingTab({
               <span className="mfg-prop-label">Cord hole:</span>
               <input
                 type="number"
-                step="0.5"
-                min="1"
+                step="0.1"
+                min="0.8"
                 max="5"
                 value={mountCordHoleMm}
                 onChange={(e) => setMountCordHoleMm(e.target.value)}
                 className="mfg-hole-input"
-                title="Diameter of hole for hanging thread in exact middle in mm"
+                title="Diameter of hole for hanging thread in exact middle in mm (default 1.5 mm)"
               />
               <span style={{ fontSize: 10, color: '#7b88a1' }}>mm</span>
             </div>
+            {mountType === 'tmount' && (
+              <div className="mfg-striker-prop" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                <span className="mfg-prop-label">Crossbar H:</span>
+                <input
+                  type="number"
+                  step="0.5"
+                  min="1"
+                  max="10"
+                  value={mountCrossbarHeightMm}
+                  onChange={(e) => setMountCrossbarHeightMm(e.target.value)}
+                  className="mfg-hole-input"
+                  title="Crossbar height (thickness) in mm (default 2.0 mm)"
+                />
+                <span style={{ fontSize: 10, color: '#7b88a1' }}>mm</span>
+              </div>
+            )}
             <div className="mfg-striker-prop">
               <span className="mfg-prop-label">Rod shaft:</span>
               <strong>Ø {mfgTubeMountDims.rodDiameter.toFixed(1)} mm</strong>
@@ -2168,8 +2190,8 @@ function ManufacturingTab({
                 </div>
                 <div className="mfg-striker-prop" style={{ gridColumn: 'span 2' }}>
                   <span className="mfg-prop-label">Crossbar Profile:</span>
-                  <strong>{(mfgTubeMountDims.crossbarWidth + 0.7).toFixed(1)} × {(mfgTubeMountDims.crossbarHeight + 0.7).toFixed(1)} mm</strong>
-                  <span className="mfg-prop-sub">(square section: height matches width)</span>
+                  <strong>{mfgTubeMountDims.crossbarWidth.toFixed(1)} × {mfgTubeMountDims.crossbarHeight.toFixed(1)} mm</strong>
+                  <span className="mfg-prop-sub">(width matches bar Ø {mfgTubeMountDims.rodDiameter.toFixed(1)} mm, height {mfgTubeMountDims.crossbarHeight.toFixed(1)} mm)</span>
                 </div>
                 <div className="mfg-striker-prop">
                   <span className="mfg-prop-label">Center cord hole:</span>

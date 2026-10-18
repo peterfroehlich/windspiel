@@ -171,7 +171,9 @@ export interface TubeMountSTLOptions {
   tubeOuterDiameter_mm: number
   tubeWallThickness_mm?: number
   tubeHoleDiameter_mm?: number
+  barDiameter_mm?: number
   cordHoleDiameter_mm?: number
+  crossbarHeight_mm?: number
   threadClearance_mm?: number
   part?: 'both' | 'male' | 'female' | 'trod' | 'crossbar' | 'splint'
   mountType?: 'threaded' | 'tmount'
@@ -217,21 +219,35 @@ export interface TubeMountDimensions {
 
 /**
  * Calculate all mechanical dimensions for the 2-part internal tube mount
- * based on tube outer diameter, wall thickness, and drilled hole diameter.
+ * based on tube outer diameter, wall thickness, and bar/hole dimensions.
  */
 export function calculateTubeMountDimensions(options: TubeMountSTLOptions): TubeMountDimensions {
   const tubeOD = Math.max(10, options.tubeOuterDiameter_mm)
   const wall = Math.max(0.4, options.tubeWallThickness_mm ?? 1.2)
   const tubeID = Math.max(6, tubeOD - 2 * wall)
 
-  // Drilled hole in tube wall: default 4.5 mm
-  const tubeHoleDia = Math.max(2.5, Math.min(tubeOD * 0.4, options.tubeHoleDiameter_mm ?? 4.5))
-  // Hanging cord hole diameter: default 2.0 mm
-  const cordHoleDia = Math.max(1.0, Math.min(tubeHoleDia * 0.75, options.cordHoleDiameter_mm ?? 2.0))
-  const clearance = Math.max(0.15, options.threadClearance_mm ?? 0.25)
+  const isTMount = options.mountType === 'tmount'
+  const tubeHoleDia = Math.max(
+    2.5,
+    Math.min(
+      tubeOD * 0.4,
+      options.tubeHoleDiameter_mm ?? (options.barDiameter_mm ? (isTMount ? options.barDiameter_mm : options.barDiameter_mm + 0.2) : 4.0)
+    )
+  )
 
-  // Shaft fits drilled hole with 0.2 mm clearance
-  const rodDiameter = Math.max(2.2, tubeHoleDia - 0.2)
+  // Default bar diameter is 4.0 mm
+  const rodDiameter = Math.max(
+    2.0,
+    options.barDiameter_mm ?? (isTMount ? (options.tubeHoleDiameter_mm ?? 4.0) : Math.max(2.2, tubeHoleDia - 0.2))
+  )
+
+  // Hanging cord hole diameter: default 1.5 mm
+  const cordHoleDia = Math.max(
+    0.8,
+    Math.min(rodDiameter * 0.75, options.cordHoleDiameter_mm ?? 1.5)
+  )
+  const clearance = Math.max(0.15, options.threadClearance_mm ?? 0.2)
+
   // Raised edges (flanges) are wider than the drilled hole so the rod cannot slide out
   const flangeDiameter = tubeHoleDia + 1.6
   const flangeThickness = 1.5
@@ -253,15 +269,21 @@ export function calculateTubeMountDimensions(options: TubeMountSTLOptions): Tube
   const threadLength = Math.min(8.0, Math.max(3.5, shaftLengthB - 1.5))
 
   // T-Mount specific calculations:
-  // Both the upper part of the T (crossbar) and the female retaining crossbar Rod have the exact same dimensions
-  const crossbarLength = Math.max(14, Math.round(tubeHoleDia * 3.2))
-  const crossbarWidth = Math.max(5.6, tubeHoleDia + 1.4)
-  const crossbarHeight = crossbarWidth
-  const tThreadMajorDia = Math.max(2.4, Math.min(rodDiameter - 1.0, 3.2))
-  const tThreadMinorDia = Math.max(1.7, tThreadMajorDia - 0.9)
-  const tThreadPitch = 1.25
-  const tThreadLength = 4.5
-  const tRodTotalLength = crossbarHeight + 0.7 + span + tThreadLength
+  // Length: 14 mm or scaled with rod diameter
+  const crossbarLength = Math.max(14, Math.round(rodDiameter * 3.5))
+  // Crossbar width matches the bar diameter (exact same width)
+  const crossbarWidth = rodDiameter
+  // Crossbar height: configurable, default 2.0 mm
+  const crossbarHeight = Math.max(1.0, options.crossbarHeight_mm ?? 2.0)
+
+  // T-thread sizing adapted to crossbar width & height
+  const tThreadMajorDia = Math.max(2.2, Math.min(rodDiameter - 1.3, 2.7))
+  const tThreadMinorDia = Math.max(1.6, tThreadMajorDia - 0.7)
+  const tThreadPitch = Math.min(0.8, Math.max(0.6, crossbarHeight * 0.35))
+  const baseWall = Math.max(0.4, Math.min(0.8, crossbarHeight * 0.2))
+  const socketDepth = crossbarHeight - baseWall
+  const tThreadLength = Math.max(1.2, socketDepth - 0.2)
+  const tRodTotalLength = crossbarHeight + span + tThreadLength
 
   return {
     tubeOD,
@@ -770,14 +792,19 @@ export function buildTubeMountCombinedGeometry(options: TubeMountSTLOptions): TH
  * Builds the solid crossbar body of length L, width W, height H.
  * With rounded ends and beveled perimeter edges.
  * If holeR > 0, an open cylindrical through-hole of radius holeR is formed at (0, 0) along Z.
+ * The core dimensions are offset so that after beveling, the outer bounding box
+ * matches exactly width W, length L, height H.
  */
 function buildCrossbarBody(length: number, width: number, height: number, holeR = 0): THREE.BufferGeometry {
-  const bevel = 0.35
-  const shape = new THREE.Shape()
-  const rad = Math.min(width, length) * 0.35
-  const halfW = width / 2
-  const halfL = length / 2
+  const bevel = Math.min(0.2, height * 0.1, width * 0.05)
+  const coreW = width - 2 * bevel
+  const coreL = length - 2 * bevel
+  const coreH = height - 2 * bevel
+  const halfW = coreW / 2
+  const halfL = coreL / 2
+  const rad = Math.min(halfW, halfL) * 0.4
 
+  const shape = new THREE.Shape()
   shape.moveTo(-halfW + rad, -halfL)
   shape.lineTo(halfW - rad, -halfL)
   shape.quadraticCurveTo(halfW, -halfL, halfW, -halfL + rad)
@@ -795,7 +822,7 @@ function buildCrossbarBody(length: number, width: number, height: number, holeR 
   }
 
   const geo = new THREE.ExtrudeGeometry(shape, {
-    depth: height,
+    depth: coreH,
     bevelEnabled: true,
     bevelSegments: 3,
     steps: 1,
@@ -917,8 +944,7 @@ export function buildTRodGeometry(options: TubeMountSTLOptions): THREE.BufferGeo
   const d = calculateTubeMountDimensions(options)
   const rRod = d.rodDiameter / 2
   const parts: THREE.BufferGeometry[] = []
-  const bevel = 0.35
-  const totalBarH = d.crossbarHeight + 2 * bevel
+  const totalBarH = d.crossbarHeight
 
   // 1. Crossbar (Upper part of T) - Solid continuous rounded bar
   const crossbarGeo = buildCrossbarBody(d.crossbarLength, d.crossbarWidth, d.crossbarHeight, 0)
@@ -991,13 +1017,12 @@ export function buildFemaleCrossbarGeometry(options: TubeMountSTLOptions): THREE
   const pitch = d.tThreadPitch
   const clearance = 0.25
   const effMajorR = (threadMajorDia / 2) + clearance
-  const bevel = 0.35
-  const totalBarH = d.crossbarHeight + 2 * bevel
+  const totalBarH = d.crossbarHeight
 
   // The socket is closed on the bottom (outer side at z = 0), and open on top (inner side facing tube)
   // Socket depth gives clearance past the male thread stud so it seats flush against the tube wall
-  const socketDepth = Math.min(totalBarH - 1.2, d.tThreadLength + 0.5)
-  const floorZ = totalBarH - socketDepth
+  const baseWall = Math.max(0.4, Math.min(0.8, d.crossbarHeight * 0.2))
+  const floorZ = baseWall
 
   // 1. Continuous crossbar body
   const bodyGeo = buildCrossbarBody(d.crossbarLength, d.crossbarWidth, d.crossbarHeight, effMajorR)

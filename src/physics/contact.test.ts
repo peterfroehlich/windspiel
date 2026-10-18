@@ -292,29 +292,50 @@ describe('stlExport: internal tube mount 3D mesh generation', () => {
 
     // Upper part of T and female retaining crossbar rod must have the same length so that the assembly looks like an H
     expect(d.crossbarLength).toBeGreaterThan(d.tubeHoleDia)
-    expect(d.crossbarWidth).toBeGreaterThan(d.rodDiameter)
-    expect(d.crossbarHeight).toBe(d.crossbarWidth)
+    // Crossbar width matches the bar diameter (same width)
+    expect(d.crossbarWidth).toBe(d.rodDiameter)
+    // Default crossbar height is 2.0 mm
+    expect(d.crossbarHeight).toBe(2.0)
 
     // Total T-rod length extends through both holes with room for male thread stud
     expect(d.tRodTotalLength).toBeGreaterThan(d.span)
+
+    // Configurable crossbar height
+    const customH = calculateTubeMountDimensions({ ...opts, crossbarHeight_mm: 3.5 })
+    expect(customH.crossbarHeight).toBe(3.5)
   })
 
-  it('builds crossbars where finished height equals finished width (square section)', () => {
+  it('defaults bar diameter to 4mm, cord hole to 1.5mm, and crossbar height to 2mm', () => {
+    const d = calculateTubeMountDimensions({
+      tubeOuterDiameter_mm: 25,
+      mountType: 'tmount',
+    })
+    expect(d.rodDiameter).toBe(4.0)
+    expect(d.crossbarWidth).toBe(4.0)
+    expect(d.cordHoleDia).toBe(1.5)
+    expect(d.crossbarHeight).toBe(2.0)
+  })
+
+  it('builds crossbars where finished width equals rod diameter and height equals configured height', () => {
     const opts: TubeMountSTLOptions = {
       tubeOuterDiameter_mm: 15,
       tubeHoleDiameter_mm: 4.0,
+      crossbarHeight_mm: 2.0,
       mountType: 'tmount',
     }
     const d = calculateTubeMountDimensions(opts)
-    expect(d.crossbarHeight).toBe(d.crossbarWidth)
+    expect(d.crossbarWidth).toBe(d.rodDiameter)
+    expect(d.crossbarHeight).toBe(2.0)
 
     const geoCrossbar = buildFemaleCrossbarGeometry(opts)
     geoCrossbar.computeBoundingBox()
     const box = geoCrossbar.boundingBox!
     const width = box.max.x - box.min.x
     const height = box.max.z - box.min.z
-    // Finished 3D bounding box height matches width within 0.001 mm
-    expect(Math.abs(width - height)).toBeLessThan(0.001)
+    // Finished 3D bounding box width matches rod diameter (d.rodDiameter) within 0.01 mm
+    expect(width).toBeCloseTo(d.rodDiameter, 2)
+    // Finished 3D bounding box height matches configured crossbar height (2.0 mm) within 0.01 mm
+    expect(height).toBeCloseTo(d.crossbarHeight, 2)
 
     // Verify socket is closed on bottom side (z = 0) and open on top side
     const pos = geoCrossbar.getAttribute('position')
