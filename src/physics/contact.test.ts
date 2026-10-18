@@ -355,6 +355,43 @@ describe('stlExport: internal tube mount 3D mesh generation', () => {
     expect(foundBottomCenter).toBe(true)
     // Top (interior) has open socket hole
     expect(foundTopCenter).toBe(false)
+
+    // Verify 100% watertight 2-manifold mesh: zero non-manifold edges, zero boundary edges
+    const idx = geoCrossbar.getIndex()!
+    const edgeCount = new Map<string, number>()
+    const directedEdges = new Map<string, number>()
+    for (let i = 0; i < idx.count; i += 3) {
+      const v = [idx.getX(i), idx.getX(i + 1), idx.getX(i + 2)]
+      for (let e = 0; e < 3; e++) {
+        const a = v[e]
+        const b = v[(e + 1) % 3]
+        const k = a < b ? `${a}_${b}` : `${b}_${a}`
+        edgeCount.set(k, (edgeCount.get(k) || 0) + 1)
+        directedEdges.set(`${a}_${b}`, (directedEdges.get(`${a}_${b}`) || 0) + 1)
+      }
+    }
+    let nonManifoldEdges = 0
+    let boundaryEdges = 0
+    for (const count of edgeCount.values()) {
+      if (count > 2) nonManifoldEdges++
+      if (count === 1) boundaryEdges++
+    }
+    expect(nonManifoldEdges).toBe(0)
+    expect(boundaryEdges).toBe(0)
+
+    // Verify consistent edge orientation (normals pointing consistently outward)
+    let inconsistentOrientation = 0
+    for (let i = 0; i < idx.count; i += 3) {
+      const v = [idx.getX(i), idx.getX(i + 1), idx.getX(i + 2)]
+      for (let e = 0; e < 3; e++) {
+        const a = v[e]
+        const b = v[(e + 1) % 3]
+        if ((directedEdges.get(`${b}_${a}`) || 0) !== 1) {
+          inconsistentOrientation++
+        }
+      }
+    }
+    expect(inconsistentOrientation).toBe(0)
   })
 
   it('generates non-empty binary STL for T-mount (both parts, T-rod, and female crossbar)', () => {

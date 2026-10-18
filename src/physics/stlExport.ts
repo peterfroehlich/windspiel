@@ -834,107 +834,49 @@ function buildCrossbarBody(length: number, width: number, height: number, holeR 
 }
 
 /**
- * Builds the continuous female thread walls inside a cylindrical blind hole socket.
- * At z = floorZ, the socket floor is closed by an annular rim and center disk.
- * At z = totalHeight, an annular rim connects the thread to the open hole rim.
+ * Calculate ray intersection point from (0, 0) with a rounded rectangle of width 2*halfW,
+ * length 2*halfL, and corner radius rad along angle theta in [0, 2*PI].
  */
-function buildFemaleThreadBlindSocket(
-  majorR: number,
-  minorR: number,
-  clearance: number,
-  pitch: number,
-  floorZ: number,
-  totalHeight: number,
-  radialSteps = 36,
-  heightSteps = 80
-): THREE.BufferGeometry {
-  const effMajorR = majorR + clearance
-  const effMinorR = minorR + clearance
-  const depth = effMajorR - effMinorR
-  const threadHeight = totalHeight - floorZ
+function getRoundedRectRayPoint(
+  theta: number,
+  halfW: number,
+  halfL: number,
+  rad: number
+): [number, number] {
+  const cos = Math.cos(theta)
+  const sin = Math.sin(theta)
+  const sX = cos >= 0 ? 1 : -1
+  const sY = sin >= 0 ? 1 : -1
+  const aCos = Math.abs(cos)
+  const aSin = Math.abs(sin)
 
-  const pos: number[] = []
-  const indices: number[] = []
+  const cx = halfW - rad
+  const cy = halfL - rad
 
-  function getInnerRadius(zRel: number, theta: number): number {
-    const frac = ((zRel / pitch) - (theta / (2 * Math.PI))) % 1.0
-    const phi = (frac + 1.0) % 1.0
-    const profile = 0.5 * (1.0 + Math.cos(2 * Math.PI * (phi - 0.5)))
-    let r = effMinorR + depth * (1.0 - profile)
-
-    const leadIn = pitch * 0.5
-    if (zRel > threadHeight - leadIn) {
-      const t = (threadHeight - zRel) / leadIn
-      r = Math.max(r, effMajorR + 0.15 * (1.0 - t))
-    }
-    if (zRel < leadIn) {
-      const t = zRel / leadIn
-      r = Math.max(r, effMajorR + 0.15 * (1.0 - t))
-    }
-    return r
-  }
-
-  for (let k = 0; k <= heightSteps; k++) {
-    const zRel = (k / heightSteps) * threadHeight
-    const z = floorZ + zRel
-    for (let j = 0; j < radialSteps; j++) {
-      const theta = (j / radialSteps) * Math.PI * 2
-      const r = getInnerRadius(zRel, theta)
-      pos.push(r * Math.cos(theta), r * Math.sin(theta), z)
+  // Check right vertical edge
+  if (aCos > 1e-6) {
+    const t = halfW / aCos
+    const y = t * aSin
+    if (y <= cy) {
+      return [sX * halfW, sY * y]
     }
   }
 
-  for (let k = 0; k < heightSteps; k++) {
-    for (let j = 0; j < radialSteps; j++) {
-      const nextJ = (j + 1) % radialSteps
-      const i0 = k * radialSteps + j
-      const i1 = k * radialSteps + nextJ
-      const i2 = (k + 1) * radialSteps + nextJ
-      const i3 = (k + 1) * radialSteps + j
-      indices.push(i0, i2, i1)
-      indices.push(i0, i3, i2)
+  // Check top horizontal edge
+  if (aSin > 1e-6) {
+    const t = halfL / aSin
+    const x = t * aCos
+    if (x <= cx) {
+      return [sX * x, sY * halfL]
     }
   }
 
-  // Annular rim at bottom z = floorZ connecting inner thread profile to effMajorR
-  const botInnerStart = 0
-  const botOuterStart = pos.length / 3
-  for (let j = 0; j < radialSteps; j++) {
-    const theta = (j / radialSteps) * Math.PI * 2
-    pos.push(effMajorR * Math.cos(theta), effMajorR * Math.sin(theta), floorZ)
-  }
-  for (let j = 0; j < radialSteps; j++) {
-    const nextJ = (j + 1) % radialSteps
-    indices.push(botInnerStart + j, botInnerStart + nextJ, botOuterStart + j)
-    indices.push(botInnerStart + nextJ, botOuterStart + nextJ, botOuterStart + j)
-  }
-
-  // Flat floor disk at z = floorZ: triangle fan from center (0, 0, floorZ) to botInnerStart
-  const centerIdx = pos.length / 3
-  pos.push(0, 0, floorZ)
-  for (let j = 0; j < radialSteps; j++) {
-    const nextJ = (j + 1) % radialSteps
-    indices.push(centerIdx, botInnerStart + j, botInnerStart + nextJ)
-  }
-
-  // Top rim at z = totalHeight connecting inner thread profile to effMajorR
-  const topInnerStart = heightSteps * radialSteps
-  const topOuterStart = pos.length / 3
-  for (let j = 0; j < radialSteps; j++) {
-    const theta = (j / radialSteps) * Math.PI * 2
-    pos.push(effMajorR * Math.cos(theta), effMajorR * Math.sin(theta), totalHeight)
-  }
-  for (let j = 0; j < radialSteps; j++) {
-    const nextJ = (j + 1) % radialSteps
-    indices.push(topInnerStart + j, topOuterStart + j, topInnerStart + nextJ)
-    indices.push(topInnerStart + nextJ, topOuterStart + j, topOuterStart + nextJ)
-  }
-
-  const geo = new THREE.BufferGeometry()
-  geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3))
-  geo.setIndex(indices)
-  geo.computeVertexNormals()
-  return geo
+  // Corner circle arc
+  const B = cx * aCos + cy * aSin
+  const C = cx * cx + cy * cy - rad * rad
+  const disc = B * B - C
+  const t = B + Math.sqrt(Math.max(0, disc))
+  return [sX * t * aCos, sY * t * aSin]
 }
 
 /**
@@ -1007,50 +949,162 @@ export function buildTRodGeometry(options: TubeMountSTLOptions): THREE.BufferGeo
 
 /**
  * Generate 3D geometry for the Female Crossbar Rod.
- * It has the exact same dimensions as the short, upper part of the T, with a matching female thread socket in the middle.
- * The socket is closed on the outer side (blind hole), leaving a solid clean exterior surface.
+ * It has the exact same outer dimensions as the short, upper part of the T, with a matching female thread socket in the middle.
+ * The socket is closed on the outer side (blind hole at z = floorZ), leaving a solid clean exterior surface at z = 0.
+ * Constructed as a single 100% watertight 2-manifold mesh with zero non-manifold edges or inverted normals.
  */
 export function buildFemaleCrossbarGeometry(options: TubeMountSTLOptions): THREE.BufferGeometry {
   const d = calculateTubeMountDimensions(options)
-  const threadMajorDia = d.tThreadMajorDia
-  const threadMinorDia = d.tThreadMinorDia
+  const length = d.crossbarLength
+  const width = d.crossbarWidth
+  const height = d.crossbarHeight
+  const majorDia = d.tThreadMajorDia
+  const minorDia = d.tThreadMinorDia
   const pitch = d.tThreadPitch
   const clearance = 0.25
-  const effMajorR = (threadMajorDia / 2) + clearance
-  const totalBarH = d.crossbarHeight
-
-  // The socket is closed on the bottom (outer side at z = 0), and open on top (inner side facing tube)
-  // Socket depth gives clearance past the male thread stud so it seats flush against the tube wall
-  const baseWall = Math.max(0.4, Math.min(0.8, d.crossbarHeight * 0.2))
+  const baseWall = Math.max(0.4, Math.min(0.8, height * 0.2))
   const floorZ = baseWall
+  const radialSteps = 48
+  const heightSteps = 60
 
-  // 1. Continuous crossbar body
-  const bodyGeo = buildCrossbarBody(d.crossbarLength, d.crossbarWidth, d.crossbarHeight, effMajorR)
+  const pos: number[] = []
+  const indices: number[] = []
 
-  // 2. Solid base plug closing the hole from z = 0 to z = floorZ
-  const plugGeo = new THREE.CylinderGeometry(effMajorR, effMajorR, floorZ, 36)
-  plugGeo.rotateX(Math.PI / 2)
-  plugGeo.translate(0, 0, floorZ / 2)
+  const halfW = width / 2
+  const halfL = length / 2
+  const cornerRad = Math.min(halfW, halfL) * 0.4
+  const bevel = Math.min(0.2, height * 0.1, width * 0.05)
 
-  // 3. Internal female helical thread socket from z = floorZ to z = totalBarH
-  const threadGeo = buildFemaleThreadBlindSocket(
-    threadMajorDia / 2,
-    threadMinorDia / 2,
-    clearance,
-    pitch,
-    floorZ,
-    totalBarH,
-    36,
-    80
-  )
+  // Ensure socket hole fits cleanly inside top face bevel with shoulder margin
+  const maxTopMajorR = (halfW - bevel) - 0.15
+  const rFemMaj = Math.min(maxTopMajorR, (majorDia / 2) + clearance)
+  const rFemMin = Math.min(rFemMaj - 0.35, (minorDia / 2) + clearance)
+  const threadHeight = height - floorZ
 
-  const parts = [normalizeGeo(bodyGeo), normalizeGeo(plugGeo), normalizeGeo(threadGeo)]
-  const merged = BufferGeometryUtils.mergeGeometries(parts, false)
-  if (!merged) {
-    throw new Error('Failed to merge Female Crossbar geometries')
+  function getInnerRadius(zRel: number, theta: number): number {
+    if (zRel <= 0 || zRel >= threadHeight) return rFemMaj
+    let taper = 1.0
+    const taperLen = pitch * 0.5
+    if (zRel < taperLen) {
+      taper = Math.sin((zRel / taperLen) * (Math.PI / 2))
+    } else if (zRel > threadHeight - taperLen) {
+      taper = Math.sin(((threadHeight - zRel) / taperLen) * (Math.PI / 2))
+    }
+    const effMin = rFemMaj - (rFemMaj - rFemMin) * taper
+
+    const u = (zRel / pitch) - (theta / (Math.PI * 2))
+    const delta = u - Math.round(u)
+    const absD = Math.abs(delta)
+
+    if (absD <= 0.15) {
+      return effMin
+    } else if (absD < 0.45) {
+      return rFemMaj - (rFemMaj - effMin) * ((0.45 - absD) / 0.30)
+    } else {
+      return rFemMaj
+    }
   }
-  merged.computeVertexNormals()
-  return merged
+
+  // 1. Outer Wall: vertical slices from z = 0 to z = height
+  const numZSteps = 24
+  for (let k = 0; k <= numZSteps; k++) {
+    const t = k / numZSteps
+    const z = t * height
+
+    let inset = 0
+    if (z < bevel) {
+      inset = bevel * (1 - Math.sin((z / bevel) * (Math.PI / 2)))
+    } else if (z > height - bevel) {
+      inset = bevel * (1 - Math.sin(((height - z) / bevel) * (Math.PI / 2)))
+    }
+
+    const curHW = Math.max(0.5, halfW - inset)
+    const curHL = Math.max(0.5, halfL - inset)
+    const curRad = Math.max(0.2, cornerRad - inset)
+
+    for (let j = 0; j < radialSteps; j++) {
+      const theta = (j / radialSteps) * Math.PI * 2
+      const [x, y] = getRoundedRectRayPoint(theta, curHW, curHL, curRad)
+      pos.push(x, y, z)
+    }
+  }
+
+  // Outer wall side quads (normals pointing OUTWARD)
+  for (let k = 0; k < numZSteps; k++) {
+    for (let j = 0; j < radialSteps; j++) {
+      const nextJ = (j + 1) % radialSteps
+      const i0 = k * radialSteps + j
+      const i1 = k * radialSteps + nextJ
+      const i2 = (k + 1) * radialSteps + nextJ
+      const i3 = (k + 1) * radialSteps + j
+      indices.push(i0, i1, i2)
+      indices.push(i0, i2, i3)
+    }
+  }
+
+  // 2. Bottom Cap at z = 0 (solid exterior floor of crossbar, normal pointing -Z)
+  const botCenterIdx = pos.length / 3
+  pos.push(0, 0, 0)
+  for (let j = 0; j < radialSteps; j++) {
+    const nextJ = (j + 1) % radialSteps
+    indices.push(botCenterIdx, nextJ, j)
+  }
+
+  // 3. Inner Helical Thread Wall: from z = floorZ to z = height
+  const innerStartIdx = pos.length / 3
+  const innerZSteps = heightSteps
+  for (let k = 0; k <= innerZSteps; k++) {
+    const zRel = (k / innerZSteps) * threadHeight
+    const z = floorZ + zRel
+    for (let j = 0; j < radialSteps; j++) {
+      const theta = (j / radialSteps) * Math.PI * 2
+      const r = getInnerRadius(zRel, theta)
+      pos.push(r * Math.cos(theta), r * Math.sin(theta), z)
+    }
+  }
+
+  // Inner thread wall quads (normals pointing INWARD towards hole center axis)
+  for (let k = 0; k < innerZSteps; k++) {
+    for (let j = 0; j < radialSteps; j++) {
+      const nextJ = (j + 1) % radialSteps
+      const i0 = innerStartIdx + k * radialSteps + j
+      const i1 = innerStartIdx + k * radialSteps + nextJ
+      const i2 = innerStartIdx + (k + 1) * radialSteps + nextJ
+      const i3 = innerStartIdx + (k + 1) * radialSteps + j
+      indices.push(i0, i2, i1)
+      indices.push(i0, i3, i2)
+    }
+  }
+
+  // 4. Socket Bottom Disc at z = floorZ (normal pointing +Z into socket)
+  const socketFloorCenterIdx = pos.length / 3
+  pos.push(0, 0, floorZ)
+  for (let j = 0; j < radialSteps; j++) {
+    const nextJ = (j + 1) % radialSteps
+    const n0 = innerStartIdx + j
+    const n1 = innerStartIdx + nextJ
+    indices.push(socketFloorCenterIdx, n0, n1)
+  }
+
+  // 5. Top Surface Ring at z = height:
+  // Connects outer wall top ring to inner thread top ring with normal pointing +Z
+  const outerTopRingStart = numZSteps * radialSteps
+  const innerTopRingStart = innerStartIdx + innerZSteps * radialSteps
+  for (let j = 0; j < radialSteps; j++) {
+    const nextJ = (j + 1) % radialSteps
+    const o0 = outerTopRingStart + j
+    const o1 = outerTopRingStart + nextJ
+    const n0 = innerTopRingStart + j
+    const n1 = innerTopRingStart + nextJ
+    indices.push(o0, o1, n0)
+    indices.push(o1, n1, n0)
+  }
+
+  const geo = new THREE.BufferGeometry()
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3))
+  geo.setIndex(indices)
+  geo.computeVertexNormals()
+  return geo
 }
 
 // Alias for backwards compatibility
