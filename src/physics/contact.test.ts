@@ -12,6 +12,7 @@ import {
   calculateTubeMountDimensions,
   buildTubeMountGeometry,
   generateTubeMountSTL,
+  buildFemaleCrossbarGeometry,
   TubeMountSTLOptions,
 } from './stlExport'
 import * as THREE from 'three'
@@ -296,6 +297,24 @@ describe('stlExport: internal tube mount 3D mesh generation', () => {
 
     // Total T-rod length extends through both holes with room for male thread stud
     expect(d.tRodTotalLength).toBeGreaterThan(d.span)
+  })
+
+  it('builds crossbars where finished height equals finished width (square section)', () => {
+    const opts: TubeMountSTLOptions = {
+      tubeOuterDiameter_mm: 15,
+      tubeHoleDiameter_mm: 4.0,
+      mountType: 'tmount',
+    }
+    const d = calculateTubeMountDimensions(opts)
+    expect(d.crossbarHeight).toBe(d.crossbarWidth)
+
+    const geoCrossbar = buildFemaleCrossbarGeometry(opts)
+    geoCrossbar.computeBoundingBox()
+    const box = geoCrossbar.boundingBox!
+    const width = box.max.x - box.min.x
+    const height = box.max.z - box.min.z
+    // Finished 3D bounding box height matches width within 0.001 mm
+    expect(Math.abs(width - height)).toBeLessThan(0.001)
   })
 
   it('generates non-empty binary STL for T-mount (both parts, T-rod, and female crossbar)', () => {

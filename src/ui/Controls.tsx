@@ -2166,6 +2166,11 @@ function ManufacturingTab({
                   <strong>{mfgTubeMountDims.crossbarLength.toFixed(1)} mm</strong>
                   <span className="mfg-prop-sub">(matching dimensions = H-shape)</span>
                 </div>
+                <div className="mfg-striker-prop" style={{ gridColumn: 'span 2' }}>
+                  <span className="mfg-prop-label">Crossbar Profile:</span>
+                  <strong>{(mfgTubeMountDims.crossbarWidth + 0.7).toFixed(1)} × {(mfgTubeMountDims.crossbarHeight + 0.7).toFixed(1)} mm</strong>
+                  <span className="mfg-prop-sub">(square section: height matches width)</span>
+                </div>
                 <div className="mfg-striker-prop">
                   <span className="mfg-prop-label">Center cord hole:</span>
                   <strong>{mfgTubeMountDims.cordHolePosFromFlange.toFixed(1)} mm</strong>
