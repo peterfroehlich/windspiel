@@ -1250,11 +1250,10 @@ function ManufacturingTab({
   const [tipsOpen, setTipsOpen] = useState(false)
 
   // Internal Tube Mount tool state
-  const [mountType, setMountType] = useState<'threaded' | 'tmount'>('threaded')
+  const [mountType, setMountType] = useState<'threaded' | 'one-part'>('threaded')
   const [mountTubeHoleMm, setMountTubeHoleMm] = useState('4.0')
   const [mountCordHoleMm, setMountCordHoleMm] = useState('1.5')
-  const [mountCrossbarHeightMm, setMountCrossbarHeightMm] = useState('2.0')
-  const [mountPart, setMountPart] = useState<'both' | 'male' | 'female' | 'trod' | 'crossbar' | 'splint'>('both')
+  const [mountPart, setMountPart] = useState<'both' | 'male' | 'female' | 'rod' | 'end-cap'>('both')
   const [mountStlExported, setMountStlExported] = useState(false)
 
   const trackerRef = useRef<AudioPitchTracker | null>(null)
@@ -1462,15 +1461,14 @@ function ManufacturingTab({
   // Internal Tube Mount calculations & download handler
   const activeSusp = tubeSuspension(config, tubes, activeIdx)
   const parsedMountHole = parseFloat(String(mountTubeHoleMm).replace(',', '.')) > 0 ? parseFloat(String(mountTubeHoleMm).replace(',', '.')) : 4.0
-  const parsedMountCord = parseFloat(String(mountCordHoleMm).replace(',', '.')) > 0 ? parseFloat(String(mountCordHoleMm).replace(',', '.')) : 1.5
-  const parsedCrossbarH = parseFloat(String(mountCrossbarHeightMm).replace(',', '.')) > 0 ? parseFloat(String(mountCrossbarHeightMm).replace(',', '.')) : 2.0
+  const defaultMountCord = mountType === 'one-part' ? 1.0 : 1.5
+  const parsedMountCord = parseFloat(String(mountCordHoleMm).replace(',', '.')) > 0 ? parseFloat(String(mountCordHoleMm).replace(',', '.')) : defaultMountCord
   const mfgTubeMountDims = calculateTubeMountDimensions({
     tubeOuterDiameter_mm: activeGeom.Do * 1000,
     tubeWallThickness_mm: activeGeom.solid ? 2.0 : activeGeom.t * 1000,
     tubeHoleDiameter_mm: parsedMountHole,
     barDiameter_mm: parsedMountHole,
     cordHoleDiameter_mm: parsedMountCord,
-    crossbarHeight_mm: parsedCrossbarH,
     part: mountPart,
     mountType,
     tubeIndex: activeIdx,
@@ -1483,7 +1481,6 @@ function ManufacturingTab({
       tubeHoleDiameter_mm: parsedMountHole,
       barDiameter_mm: parsedMountHole,
       cordHoleDiameter_mm: parsedMountCord,
-      crossbarHeight_mm: parsedCrossbarH,
       part: mountPart,
       mountType,
       tubeIndex: activeIdx,
@@ -2069,7 +2066,7 @@ function ManufacturingTab({
               <span>🖨️ Internal Tube Mount (STL)</span>
             </div>
             <span className="mfg-striker-badge">
-              {mountType === 'threaded' ? 'Center Mount • 2-Part Threaded' : 'Center Mount • T-Rod & Crossbar (H-Shape)'}
+              {mountType === 'threaded' ? 'Center Mount • 2-Part Threaded' : 'Center Mount • One-Part rod'}
             </span>
           </div>
 
@@ -2082,6 +2079,7 @@ function ManufacturingTab({
                 className={`mfg-part-pill ${mountType === 'threaded' ? 'active' : ''}`}
                 onClick={() => {
                   setMountType('threaded')
+                  setMountCordHoleMm('1.5')
                   setMountPart('both')
                 }}
                 title="Two-part rod with male thread stud and female threaded socket"
@@ -2090,14 +2088,15 @@ function ManufacturingTab({
               </button>
               <button
                 type="button"
-                className={`mfg-part-pill ${mountType === 'tmount' ? 'active' : ''}`}
+                className={`mfg-part-pill ${mountType === 'one-part' ? 'active' : ''}`}
                 onClick={() => {
-                  setMountType('tmount')
+                  setMountType('one-part')
+                  setMountCordHoleMm('1.0')
                   setMountPart('both')
                 }}
-                title="T-shaped rod with male thread on the end and matching female threaded crossbar (H-shape)"
+                title="Slotted one-piece rod with retaining flange and separate keyed end cap"
               >
-                T-Rod &amp; Crossbar (H-Shape)
+                One-Part rod
               </button>
             </div>
           </div>
@@ -2112,7 +2111,7 @@ function ManufacturingTab({
               <strong>{mfgTubeMountDims.span.toFixed(1)} mm</strong>
             </div>
             <div className="mfg-striker-prop" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-              <span className="mfg-prop-label">{mountType === 'tmount' ? 'Bar Ø (hole):' : 'Drilled hole:'}</span>
+              <span className="mfg-prop-label">Drilled hole:</span>
               <input
                 type="number"
                 step="0.5"
@@ -2135,26 +2134,10 @@ function ManufacturingTab({
                 value={mountCordHoleMm}
                 onChange={(e) => setMountCordHoleMm(e.target.value)}
                 className="mfg-hole-input"
-                title="Diameter of hole for hanging thread in exact middle in mm (default 1.5 mm)"
+                title="Diameter of the hanging cord hole in mm"
               />
               <span style={{ fontSize: 10, color: '#7b88a1' }}>mm</span>
             </div>
-            {mountType === 'tmount' && (
-              <div className="mfg-striker-prop" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                <span className="mfg-prop-label">Crossbar H:</span>
-                <input
-                  type="number"
-                  step="0.5"
-                  min="1"
-                  max="10"
-                  value={mountCrossbarHeightMm}
-                  onChange={(e) => setMountCrossbarHeightMm(e.target.value)}
-                  className="mfg-hole-input"
-                  title="Crossbar height (thickness) in mm (default 2.0 mm)"
-                />
-                <span style={{ fontSize: 10, color: '#7b88a1' }}>mm</span>
-              </div>
-            )}
             <div className="mfg-striker-prop">
               <span className="mfg-prop-label">Rod shaft:</span>
               <strong>Ø {mfgTubeMountDims.rodDiameter.toFixed(1)} mm</strong>
@@ -2180,29 +2163,17 @@ function ManufacturingTab({
             ) : (
               <>
                 <div className="mfg-striker-prop">
-                  <span className="mfg-prop-label">T-Crossbar (Male):</span>
-                  <strong>{mfgTubeMountDims.crossbarLength.toFixed(1)} × {mfgTubeMountDims.crossbarWidth.toFixed(1)} × {mfgTubeMountDims.crossbarHeight.toFixed(1)} mm</strong>
-                  <span className="mfg-prop-sub">(L × W × H, thickness {mfgTubeMountDims.crossbarHeight.toFixed(1)} mm)</span>
+                  <span className="mfg-prop-label">Flange / end cap:</span>
+                  <strong>Ø {mfgTubeMountDims.flangeDiameter.toFixed(1)} × 1.0 mm</strong>
                 </div>
                 <div className="mfg-striker-prop">
-                  <span className="mfg-prop-label">Retaining Bar (Female):</span>
-                  <strong>{mfgTubeMountDims.crossbarLength.toFixed(1)} × {mfgTubeMountDims.crossbarWidth.toFixed(1)} × {mfgTubeMountDims.crossbarHeight.toFixed(1)} mm</strong>
-                  <span className="mfg-prop-sub">(matching thickness {mfgTubeMountDims.crossbarHeight.toFixed(1)} mm = H-shape)</span>
-                </div>
-                <div className="mfg-striker-prop" style={{ gridColumn: 'span 2' }}>
-                  <span className="mfg-prop-label">Crossbars Profile:</span>
-                  <strong>{mfgTubeMountDims.crossbarWidth.toFixed(1)} mm wide × {mfgTubeMountDims.crossbarHeight.toFixed(1)} mm thick</strong>
-                  <span className="mfg-prop-sub">(both male &amp; female crossbars have identical thickness {mfgTubeMountDims.crossbarHeight.toFixed(1)} mm)</span>
-                </div>
-                <div className="mfg-striker-prop">
-                  <span className="mfg-prop-label">Center cord hole:</span>
+                  <span className="mfg-prop-label">Cord hole from flange:</span>
                   <strong>{mfgTubeMountDims.cordHolePosFromFlange.toFixed(1)} mm</strong>
-                  <span className="mfg-prop-sub">(exact middle of tube span)</span>
+                  <span className="mfg-prop-sub">(near the rod tip)</span>
                 </div>
-                <div className="mfg-striker-prop" style={{ gridColumn: 'span 2' }}>
-                  <span className="mfg-prop-label">Thread:</span>
-                  <strong>M{mfgTubeMountDims.tThreadMajorDia.toFixed(1)} × {mfgTubeMountDims.tThreadPitch.toFixed(2)} mm</strong>
-                  <span className="mfg-prop-sub">({mfgTubeMountDims.tThreadLength.toFixed(1)} mm stud &amp; blind socket closed on outside, 0.25mm tolerance)</span>
+                <div className="mfg-striker-prop">
+                  <span className="mfg-prop-label">Rod height:</span>
+                  <strong>{mfgTubeMountDims.totalAssembledLength.toFixed(1)} mm</strong>
                 </div>
               </>
             )}
@@ -2243,19 +2214,19 @@ function ManufacturingTab({
                 <>
                   <button
                     type="button"
-                    className={`mfg-part-pill ${mountPart === 'trod' ? 'active' : ''}`}
-                    onClick={() => setMountPart('trod')}
-                    title="T-Rod: T-shaped pin with upper crossbar, center cord hole, and male thread stud"
+                    className={`mfg-part-pill ${mountPart === 'rod' ? 'active' : ''}`}
+                    onClick={() => setMountPart('rod')}
+                    title="One-piece slotted rod with flange and transverse cord hole"
                   >
-                    T-Rod (Male)
+                    Rod
                   </button>
                   <button
                     type="button"
-                    className={`mfg-part-pill ${mountPart === 'crossbar' ? 'active' : ''}`}
-                    onClick={() => setMountPart('crossbar')}
-                    title="Crossbar: Retaining rod with matching dimensions and central blind female thread"
+                    className={`mfg-part-pill ${mountPart === 'end-cap' ? 'active' : ''}`}
+                    onClick={() => setMountPart('end-cap')}
+                    title="Separate 1 mm keyed retaining cap"
                   >
-                    Crossbar (Female)
+                    End Cap
                   </button>
                 </>
               )}
@@ -2270,7 +2241,7 @@ function ManufacturingTab({
               title={`Download 3D printable binary STL for Tube #${activeIdx + 1}: ${
                 mountType === 'threaded'
                   ? mountPart === 'both' ? 'Both Parts' : mountPart === 'male' ? 'Part A (Male)' : 'Part B (Female)'
-                  : mountPart === 'both' ? 'Both Parts' : mountPart === 'trod' ? 'T-Rod (Male)' : 'Crossbar (Female)'
+                  : mountPart === 'both' ? 'Both Parts' : mountPart === 'rod' ? 'Rod' : 'End Cap'
               }`}
             >
               {mountStlExported
@@ -2282,15 +2253,15 @@ function ManufacturingTab({
                       ? '💾 Download Part A (Male) STL'
                       : '💾 Download Part B (Female) STL'
                   : mountPart === 'both'
-                    ? '💾 Download T-Mount & Crossbar (Both Parts) STL'
-                    : mountPart === 'trod'
-                      ? '💾 Download T-Rod (Male) STL'
-                      : `💾 Download Female Crossbar (H=${mfgTubeMountDims.crossbarHeight.toFixed(1)}mm) STL`}
+                    ? '💾 Download One-Part rod & End Cap STL'
+                    : mountPart === 'rod'
+                      ? '💾 Download Rod STL'
+                      : '💾 Download End Cap STL'}
             </button>
             <div className="mfg-striker-hint">
               {mountType === 'threaded'
                 ? 'A two-part rod connected with a thread with a hole for a hanging thread in the exact middle, with slightly raised edges so it does not fall out. Insert Part A and Part B from opposite sides through the drilled tube holes and screw together inside.'
-                : 'A T-shaped rod inserted fully through both holes with a male thread on the end, fastened with a matching female threaded crossbar of identical outer dimensions (blind socket closed on outside). When tightened, both crossbars form a symmetric H with hanging cord in the middle.'}
+                : 'One-piece rod with a 1 mm retaining flange, relief grooves, a longitudinal slot, and a cord hole near the tip. Insert through the drilled tube holes and fit the separate keyed end cap. Sized to the selected tube diameter.'}
             </div>
           </div>
         </div>

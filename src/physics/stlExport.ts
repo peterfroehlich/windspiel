@@ -1,4 +1,5 @@
 import * as THREE from 'three'
+import { booleans, primitives, transforms, geometries } from '@jscad/modeling'
 import { STLExporter } from 'three/examples/jsm/exporters/STLExporter.js'
 import * as BufferGeometryUtils from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 
@@ -173,10 +174,9 @@ export interface TubeMountSTLOptions {
   tubeHoleDiameter_mm?: number
   barDiameter_mm?: number
   cordHoleDiameter_mm?: number
-  crossbarHeight_mm?: number
   threadClearance_mm?: number
-  part?: 'both' | 'male' | 'female' | 'trod' | 'crossbar' | 'splint'
-  mountType?: 'threaded' | 'tmount'
+  part?: 'both' | 'male' | 'female' | 'rod' | 'end-cap'
+  mountType?: 'threaded' | 'one-part'
   tubeIndex?: number
 }
 
@@ -200,25 +200,10 @@ export interface TubeMountDimensions {
   pitch: number
   threadLength: number
   totalAssembledLength: number
-
-  // T-Mount specific dimensions
-  crossbarLength: number
-  crossbarWidth: number
-  crossbarHeight: number
-  slotWidth: number
-  slotHeight: number
-  splintLength: number
-  splintWidth: number
-  splintThickness: number
-  tRodTotalLength: number
-  tThreadMajorDia: number
-  tThreadMinorDia: number
-  tThreadPitch: number
-  tThreadLength: number
 }
 
 /**
- * Calculate all mechanical dimensions for the 2-part internal tube mount
+ * Calculate mechanical dimensions for the selected internal tube mount
  * based on tube outer diameter, wall thickness, and bar/hole dimensions.
  */
 export function calculateTubeMountDimensions(options: TubeMountSTLOptions): TubeMountDimensions {
@@ -226,36 +211,36 @@ export function calculateTubeMountDimensions(options: TubeMountSTLOptions): Tube
   const wall = Math.max(0.4, options.tubeWallThickness_mm ?? 1.2)
   const tubeID = Math.max(6, tubeOD - 2 * wall)
 
-  const isTMount = options.mountType === 'tmount'
+  const isOnePart = options.mountType === 'one-part'
   const tubeHoleDia = Math.max(
     2.5,
     Math.min(
       tubeOD * 0.4,
-      options.tubeHoleDiameter_mm ?? (options.barDiameter_mm ? (isTMount ? options.barDiameter_mm : options.barDiameter_mm + 0.2) : 4.0)
+      options.tubeHoleDiameter_mm ?? (options.barDiameter_mm ? (isOnePart ? options.barDiameter_mm : options.barDiameter_mm + 0.2) : 4.0)
     )
   )
 
-  // Default bar diameter is 4.0 mm
-  const rodDiameter = Math.max(
+  // The one-part SCAD shaft is 0.1 mm narrower than the drilled hole.
+  const rodDiameter = isOnePart ? tubeHoleDia - 0.1 : Math.max(
     2.0,
-    options.barDiameter_mm ?? (isTMount ? (options.tubeHoleDiameter_mm ?? 4.0) : Math.max(2.2, tubeHoleDia - 0.2))
+    options.barDiameter_mm ?? Math.max(2.2, tubeHoleDia - 0.2)
   )
 
-  // Hanging cord hole diameter: default 1.5 mm
+  // Cord hole defaults: 1 mm for the supplied SCAD, 1.5 mm for the threaded rod.
   const cordHoleDia = Math.max(
     0.8,
-    Math.min(rodDiameter * 0.75, options.cordHoleDiameter_mm ?? 1.5)
+    Math.min(rodDiameter * 0.75, options.cordHoleDiameter_mm ?? (isOnePart ? 1 : 1.5))
   )
   const clearance = Math.max(0.15, options.threadClearance_mm ?? 0.2)
 
   // Raised edges (flanges) are wider than the drilled hole so the rod cannot slide out
-  const flangeDiameter = tubeHoleDia + 1.6
-  const flangeThickness = 1.5
+  const flangeDiameter = tubeHoleDia + (isOnePart ? 1 : 1.6)
+  const flangeThickness = isOnePart ? 1 : 1.5
 
-  // Span between flanges = tube outer diameter + 0.4 mm acoustic clearance
-  const span = tubeOD + 0.4
-  // Exact middle of the span where the hanging cord hole sits
-  const cordHolePosFromFlange = span / 2
+  // Use the tube diameter as pipe_d in the one-part SCAD.
+  const span = tubeOD + (isOnePart ? 0 : 0.4)
+  // One-part cord hole sits near the tip; the threaded mount suspends at its center.
+  const cordHolePosFromFlange = isOnePart ? span + 0.3 : span / 2
 
   // Part A holds the central hole and extends slightly past center to start the male thread
   const shoulderPastCenter = Math.max(1.8, cordHoleDia / 2 + 0.8)
@@ -267,23 +252,6 @@ export function calculateTubeMountDimensions(options: TubeMountSTLOptions): Tube
   const threadMinorDia = Math.max(1.4, threadMajorDia - 0.9)
   const pitch = 1.25
   const threadLength = Math.min(8.0, Math.max(3.5, shaftLengthB - 1.5))
-
-  // T-Mount specific calculations:
-  // Length: 14 mm or scaled with rod diameter
-  const crossbarLength = Math.max(14, Math.round(rodDiameter * 3.5))
-  // Crossbar width matches the bar diameter (exact same width)
-  const crossbarWidth = rodDiameter
-  // Crossbar height: configurable, default 2.0 mm
-  const crossbarHeight = Math.max(1.0, options.crossbarHeight_mm ?? 2.0)
-
-  // T-thread sizing adapted to crossbar width & height
-  const tThreadMajorDia = Math.max(2.2, Math.min(rodDiameter - 1.3, 2.7))
-  const tThreadMinorDia = Math.max(1.6, tThreadMajorDia - 0.7)
-  const tThreadPitch = Math.min(0.8, Math.max(0.6, crossbarHeight * 0.35))
-  const baseWall = Math.max(0.4, Math.min(0.8, crossbarHeight * 0.2))
-  const socketDepth = crossbarHeight - baseWall
-  const tThreadLength = Math.max(1.2, socketDepth - 0.2)
-  const tRodTotalLength = crossbarHeight + span + tThreadLength
 
   return {
     tubeOD,
@@ -304,20 +272,7 @@ export function calculateTubeMountDimensions(options: TubeMountSTLOptions): Tube
     threadMinorDia,
     pitch,
     threadLength,
-    totalAssembledLength: span + 2 * flangeThickness,
-    crossbarLength,
-    crossbarWidth,
-    crossbarHeight,
-    slotWidth: rodDiameter,
-    slotHeight: rodDiameter,
-    splintLength: crossbarLength,
-    splintWidth: crossbarWidth,
-    splintThickness: crossbarHeight,
-    tRodTotalLength,
-    tThreadMajorDia,
-    tThreadMinorDia,
-    tThreadPitch,
-    tThreadLength,
+    totalAssembledLength: isOnePart ? span + 2 : span + 2 * flangeThickness,
   }
 }
 
@@ -788,369 +743,108 @@ export function buildTubeMountCombinedGeometry(options: TubeMountSTLOptions): TH
   return combined
 }
 
-/**
- * Builds the solid crossbar body of length L, width W, height H.
- * With rounded ends and beveled perimeter edges.
- * If holeR > 0, an open cylindrical through-hole of radius holeR is formed at (0, 0) along Z.
- * The core dimensions are offset so that after beveling, the outer bounding box
- * matches exactly width W, length L, height H.
- */
-function buildCrossbarBody(length: number, width: number, height: number, holeR = 0): THREE.BufferGeometry {
-  const bevel = Math.min(0.2, height * 0.1, width * 0.05)
-  const coreW = width - 2 * bevel
-  const coreL = length - 2 * bevel
-  const coreH = height - 2 * bevel
-  const halfW = coreW / 2
-  const halfL = coreL / 2
-  const rad = Math.min(halfW, halfL) * 0.4
-
-  const shape = new THREE.Shape()
-  shape.moveTo(-halfW + rad, -halfL)
-  shape.lineTo(halfW - rad, -halfL)
-  shape.quadraticCurveTo(halfW, -halfL, halfW, -halfL + rad)
-  shape.lineTo(halfW, halfL - rad)
-  shape.quadraticCurveTo(halfW, halfL, halfW - rad, halfL)
-  shape.lineTo(-halfW + rad, halfL)
-  shape.quadraticCurveTo(-halfW, halfL, -halfW, halfL - rad)
-  shape.lineTo(-halfW, -halfL + rad)
-  shape.quadraticCurveTo(-halfW, -halfL, -halfW + rad, -halfL)
-
-  if (holeR > 0) {
-    const hole = new THREE.Path()
-    hole.absarc(0, 0, holeR, 0, Math.PI * 2, true)
-    shape.holes.push(hole)
-  }
-
-  const geo = new THREE.ExtrudeGeometry(shape, {
-    depth: coreH,
-    bevelEnabled: true,
-    bevelSegments: 3,
-    steps: 1,
-    bevelSize: bevel,
-    bevelThickness: bevel,
+/** Direct translation of the supplied female() and end_cap() OpenSCAD solids. */
+function onePartRodSolids(options: TubeMountSTLOptions) {
+  const d = calculateTubeMountDimensions(options)
+  const pipe = d.tubeOD
+  const hole = d.tubeHoleDia
+  const cylinder = (height: number, diameter: number, z: number) => primitives.cylinder({
+    height, radius: diameter / 2, segments: 100, center: [0, 0, z + height / 2],
   })
-  geo.translate(0, 0, bevel)
-  return geo
-}
-
-/**
- * Calculate ray intersection point from (0, 0) with a rounded rectangle of width 2*halfW,
- * length 2*halfL, and corner radius rad along angle theta in [0, 2*PI].
- */
-function getRoundedRectRayPoint(
-  theta: number,
-  halfW: number,
-  halfL: number,
-  rad: number
-): [number, number] {
-  const cos = Math.cos(theta)
-  const sin = Math.sin(theta)
-  const sX = cos >= 0 ? 1 : -1
-  const sY = sin >= 0 ? 1 : -1
-  const aCos = Math.abs(cos)
-  const aSin = Math.abs(sin)
-
-  const cx = halfW - rad
-  const cy = halfL - rad
-
-  // Check right vertical edge
-  if (aCos > 1e-6) {
-    const t = halfW / aCos
-    const y = t * aSin
-    if (y <= cy) {
-      return [sX * halfW, sY * y]
-    }
-  }
-
-  // Check top horizontal edge
-  if (aSin > 1e-6) {
-    const t = halfL / aSin
-    const x = t * aCos
-    if (x <= cx) {
-      return [sX * x, sY * halfL]
-    }
-  }
-
-  // Corner circle arc
-  const B = cx * aCos + cy * aSin
-  const C = cx * cx + cy * cy - rad * rad
-  const disc = B * B - C
-  const t = B + Math.sqrt(Math.max(0, disc))
-  return [sX * t * aCos, sY * t * aSin]
-}
-
-/**
- * Generate 3D geometry for the T-Rod (T-shaped pin with upper crossbar, center cord hole, and male thread stud at the long end).
- */
-export function buildTRodGeometry(options: TubeMountSTLOptions): THREE.BufferGeometry {
-  const d = calculateTubeMountDimensions(options)
-  const rRod = d.rodDiameter / 2
-  const parts: THREE.BufferGeometry[] = []
-  const totalBarH = d.crossbarHeight
-
-  // 1. Crossbar (Upper part of T) - Solid continuous rounded bar
-  const crossbarGeo = buildCrossbarBody(d.crossbarLength, d.crossbarWidth, d.crossbarHeight, 0)
-  parts.push(crossbarGeo)
-
-  // 2. Stem starting from bottom of crossbar
-  const zStemBase = totalBarH
-  const zHole = zStemBase + d.span / 2
-  const rHole = Math.min(d.cordHoleDia / 2, rRod * 0.7)
-
-  // Shaft lower section (from crossbar to cord hole)
-  const lenLower = (zHole - rHole) - zStemBase
-  if (lenLower > 0) {
-    const shaftLower = new THREE.CylinderGeometry(rRod, rRod, lenLower, 32)
-    shaftLower.rotateX(Math.PI / 2)
-    shaftLower.translate(0, 0, zStemBase + lenLower / 2)
-    parts.push(shaftLower)
-  }
-
-  // Cord hole pillars (exact round circular cylinder)
-  const pillar1 = buildRoundHolePillar(rRod, rHole, zHole, true, 32, 24)
-  const pillar2 = buildRoundHolePillar(rRod, rHole, zHole, false, 32, 24)
-  parts.push(pillar1, pillar2)
-
-  // Shaft upper section (from cord hole to exit shoulder)
-  const zShoulder = zStemBase + d.span
-  const lenUpper = zShoulder - (zHole + rHole)
-  if (lenUpper > 0) {
-    const shaftUpper = new THREE.CylinderGeometry(rRod, rRod, lenUpper, 32)
-    shaftUpper.rotateX(Math.PI / 2)
-    shaftUpper.translate(0, 0, (zHole + rHole) + lenUpper / 2)
-    parts.push(shaftUpper)
-  }
-
-  // 3. Male thread stud extending past the shoulder
-  const threadMajorDia = d.tThreadMajorDia
-  const threadMinorDia = d.tThreadMinorDia
-  const pitch = d.tThreadPitch
-  const threadLength = d.tThreadLength
-
-  const maleThread = buildParametricMaleThread(
-    threadMajorDia / 2,
-    threadMinorDia / 2,
-    pitch,
-    threadLength,
-    36,
-    80
+  // SCAD cubes use a corner origin; JSCAD cuboids use their center.
+  const box = (x: number, y: number, z: number, sx: number, sy: number, sz: number) =>
+    primitives.cuboid({ size: [sx, sy, sz], center: [x + sx / 2, y + sy / 2, z + sz / 2] })
+  const grooveZ = pipe / 2 - 1
+  const cordHole = transforms.translate([0, 0, pipe + 0.3], transforms.rotateY(Math.PI / 2,
+    primitives.cylinder({ height: 100, radius: d.cordHoleDia / 2, segments: 100 })))
+  const shaft = booleans.subtract(
+    cylinder(pipe + 1, hole - 0.1, 0),
+    cordHole,
+    box(-50, 0.45, grooveZ, 100, 1, 2),
+    box(-50, -1.55, grooveZ, 100, 1, 2),
+    transforms.rotateZ(Math.PI / 2, box(-50, hole / 2 - 1, grooveZ, 100, 1, 2)),
+    transforms.rotateZ(Math.PI / 2, box(-50, -hole / 2, grooveZ, 100, 1, 2)),
+    box(hole / 2 - 1, -0.5, grooveZ, 1, 1, 100),
   )
-  maleThread.translate(0, 0, zShoulder)
-  parts.push(maleThread)
-
-  const normalized = parts.map(normalizeGeo)
-  const merged = BufferGeometryUtils.mergeGeometries(normalized, false)
-  if (!merged) {
-    throw new Error('Failed to merge T-Rod geometries')
+  const female = booleans.union(cylinder(1, hole + 1, -1), shaft)
+  return {
+    rod: transforms.translate([0, 0, 1], female),
+    cap: booleans.subtract(cylinder(1, hole + 1, 0), transforms.translate([0, 0, -pipe + 2], female)),
   }
-  merged.computeVertexNormals()
-  return merged
 }
 
-/**
- * Generate 3D geometry for the Female Crossbar Rod.
- * It has the exact same outer dimensions as the short, upper part of the T, with a matching female thread socket in the middle.
- * The socket is closed on the outer side (blind hole at z = floorZ), leaving a solid clean exterior surface at z = 0.
- * Constructed as a single 100% watertight 2-manifold mesh with zero non-manifold edges or inverted normals.
- */
-export function buildFemaleCrossbarGeometry(options: TubeMountSTLOptions): THREE.BufferGeometry {
-  const d = calculateTubeMountDimensions(options)
-  const length = d.crossbarLength
-  const width = d.crossbarWidth
-  const height = d.crossbarHeight
-  const majorDia = d.tThreadMajorDia
-  const minorDia = d.tThreadMinorDia
-  const pitch = d.tThreadPitch
-  const clearance = 0.25
-  const baseWall = Math.max(0.4, Math.min(0.8, height * 0.2))
-  const floorZ = baseWall
-  const radialSteps = 48
-  const heightSteps = 60
-
-  const pos: number[] = []
-  const indices: number[] = []
-
-  const halfW = width / 2
-  const halfL = length / 2
-  const cornerRad = Math.min(halfW, halfL) * 0.4
-  const bevel = Math.min(0.2, height * 0.1, width * 0.05)
-
-  // Ensure socket hole fits cleanly inside top face bevel with shoulder margin
-  const maxTopMajorR = (halfW - bevel) - 0.15
-  const rFemMaj = Math.min(maxTopMajorR, (majorDia / 2) + clearance)
-  const rFemMin = Math.min(rFemMaj - 0.35, (minorDia / 2) + clearance)
-  const threadHeight = height - floorZ
-
-  function getInnerRadius(zRel: number, theta: number): number {
-    if (zRel <= 0 || zRel >= threadHeight) return rFemMaj
-    let taper = 1.0
-    const taperLen = pitch * 0.5
-    if (zRel < taperLen) {
-      taper = Math.sin((zRel / taperLen) * (Math.PI / 2))
-    } else if (zRel > threadHeight - taperLen) {
-      taper = Math.sin(((threadHeight - zRel) / taperLen) * (Math.PI / 2))
+function solidToGeometry(solid: ReturnType<typeof primitives.cylinder>): THREE.BufferGeometry {
+  // Weld boolean vertices and split shared polygon edges at every T-junction.
+  // Center fans preserve these collinear boundary vertices during triangulation.
+  const tolerance = 1e-4 // mm; below print resolution, above CSG intersection noise
+  const toleranceSq = tolerance * tolerance
+  const allVertices: THREE.Vector3[] = []
+  const polygons = geometries.geom3.toPolygons(solid).map(polygon => {
+    const points = polygon.vertices.map(vertex => {
+      const point = new THREE.Vector3(...vertex)
+      const existing = allVertices.find(candidate => candidate.distanceToSquared(point) < toleranceSq)
+      if (existing) return existing
+      allVertices.push(point)
+      return point
+    })
+    return points.filter((point, i) => point !== points[(i + 1) % points.length])
+  })
+  const vertices: number[] = []
+  const delta = new THREE.Vector3()
+  const offset = new THREE.Vector3()
+  for (const polygon of polygons) {
+    const boundary: THREE.Vector3[] = []
+    for (let i = 0; i < polygon.length; i++) {
+      const a = polygon[i], b = polygon[(i + 1) % polygon.length]
+      delta.subVectors(b, a)
+      const lengthSq = delta.lengthSq()
+      if (lengthSq < toleranceSq) continue
+      const splits: { t: number; point: THREE.Vector3 }[] = [{ t: 0, point: a }]
+      for (const point of allVertices) {
+        offset.subVectors(point, a)
+        const t = offset.dot(delta) / lengthSq
+        if (t <= 1e-7 || t >= 1 - 1e-7) continue
+        if (offset.addScaledVector(delta, -t).lengthSq() < toleranceSq) splits.push({ t, point })
+      }
+      splits.sort((a, b) => a.t - b.t)
+      boundary.push(...splits.map(split => split.point))
     }
-    const effMin = rFemMaj - (rFemMaj - rFemMin) * taper
-
-    const u = (zRel / pitch) - (theta / (Math.PI * 2))
-    const delta = u - Math.round(u)
-    const absD = Math.abs(delta)
-
-    if (absD <= 0.15) {
-      return effMin
-    } else if (absD < 0.45) {
-      return rFemMaj - (rFemMaj - effMin) * ((0.45 - absD) / 0.30)
-    } else {
-      return rFemMaj
+    if (boundary.length < 3) continue
+    const center = boundary.reduce((sum, point) => sum.add(point), new THREE.Vector3()).divideScalar(boundary.length)
+    const area = boundary.reduce((sum, point, i) => sum.add(new THREE.Vector3().crossVectors(
+      point.clone().sub(center), boundary[(i + 1) % boundary.length].clone().sub(center),
+    )), new THREE.Vector3())
+    if (area.lengthSq() < 1e-16) continue
+    for (let i = 0; i < boundary.length; i++) {
+      vertices.push(...center.toArray(), ...boundary[i].toArray(), ...boundary[(i + 1) % boundary.length].toArray())
     }
   }
-
-  // 1. Outer Wall: vertical slices from z = 0 to z = height
-  const numZSteps = 24
-  for (let k = 0; k <= numZSteps; k++) {
-    const t = k / numZSteps
-    const z = t * height
-
-    let inset = 0
-    if (z < bevel) {
-      inset = bevel * (1 - Math.sin((z / bevel) * (Math.PI / 2)))
-    } else if (z > height - bevel) {
-      inset = bevel * (1 - Math.sin(((height - z) / bevel) * (Math.PI / 2)))
-    }
-
-    const curHW = Math.max(0.5, halfW - inset)
-    const curHL = Math.max(0.5, halfL - inset)
-    const curRad = Math.max(0.2, cornerRad - inset)
-
-    for (let j = 0; j < radialSteps; j++) {
-      const theta = (j / radialSteps) * Math.PI * 2
-      const [x, y] = getRoundedRectRayPoint(theta, curHW, curHL, curRad)
-      pos.push(x, y, z)
-    }
-  }
-
-  // Outer wall side quads (normals pointing OUTWARD)
-  for (let k = 0; k < numZSteps; k++) {
-    for (let j = 0; j < radialSteps; j++) {
-      const nextJ = (j + 1) % radialSteps
-      const i0 = k * radialSteps + j
-      const i1 = k * radialSteps + nextJ
-      const i2 = (k + 1) * radialSteps + nextJ
-      const i3 = (k + 1) * radialSteps + j
-      indices.push(i0, i1, i2)
-      indices.push(i0, i2, i3)
-    }
-  }
-
-  // 2. Bottom Cap at z = 0 (solid exterior floor of crossbar, normal pointing -Z)
-  const botCenterIdx = pos.length / 3
-  pos.push(0, 0, 0)
-  for (let j = 0; j < radialSteps; j++) {
-    const nextJ = (j + 1) % radialSteps
-    indices.push(botCenterIdx, nextJ, j)
-  }
-
-  // 3. Inner Helical Thread Wall: from z = floorZ to z = height
-  const innerStartIdx = pos.length / 3
-  const innerZSteps = heightSteps
-  for (let k = 0; k <= innerZSteps; k++) {
-    const zRel = (k / innerZSteps) * threadHeight
-    const z = floorZ + zRel
-    for (let j = 0; j < radialSteps; j++) {
-      const theta = (j / radialSteps) * Math.PI * 2
-      const r = getInnerRadius(zRel, theta)
-      pos.push(r * Math.cos(theta), r * Math.sin(theta), z)
-    }
-  }
-
-  // Inner thread wall quads (normals pointing INWARD towards hole center axis)
-  for (let k = 0; k < innerZSteps; k++) {
-    for (let j = 0; j < radialSteps; j++) {
-      const nextJ = (j + 1) % radialSteps
-      const i0 = innerStartIdx + k * radialSteps + j
-      const i1 = innerStartIdx + k * radialSteps + nextJ
-      const i2 = innerStartIdx + (k + 1) * radialSteps + nextJ
-      const i3 = innerStartIdx + (k + 1) * radialSteps + j
-      indices.push(i0, i2, i1)
-      indices.push(i0, i3, i2)
-    }
-  }
-
-  // 4. Socket Bottom Disc at z = floorZ (normal pointing +Z into socket)
-  const socketFloorCenterIdx = pos.length / 3
-  pos.push(0, 0, floorZ)
-  for (let j = 0; j < radialSteps; j++) {
-    const nextJ = (j + 1) % radialSteps
-    const n0 = innerStartIdx + j
-    const n1 = innerStartIdx + nextJ
-    indices.push(socketFloorCenterIdx, n0, n1)
-  }
-
-  // 5. Top Surface Ring at z = height:
-  // Connects outer wall top ring to inner thread top ring with normal pointing +Z
-  const outerTopRingStart = numZSteps * radialSteps
-  const innerTopRingStart = innerStartIdx + innerZSteps * radialSteps
-  for (let j = 0; j < radialSteps; j++) {
-    const nextJ = (j + 1) % radialSteps
-    const o0 = outerTopRingStart + j
-    const o1 = outerTopRingStart + nextJ
-    const n0 = innerTopRingStart + j
-    const n1 = innerTopRingStart + nextJ
-    indices.push(o0, o1, n0)
-    indices.push(o1, n1, n0)
-  }
-
-  const geo = new THREE.BufferGeometry()
-  geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3))
-  geo.setIndex(indices)
-  geo.computeVertexNormals()
-  return geo
+  const geometry = new THREE.BufferGeometry()
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3))
+  geometry.computeVertexNormals()
+  return geometry
 }
 
-// Alias for backwards compatibility
-export const buildSplintGeometry = buildFemaleCrossbarGeometry
-
-/**
- * Generate 3D geometry with both T-Rod and Female Crossbar positioned side-by-side on the print bed.
- */
-export function buildTMountCombinedGeometry(options: TubeMountSTLOptions): THREE.BufferGeometry {
-  const d = calculateTubeMountDimensions(options)
-  const geoTRod = buildTRodGeometry(options)
-  const geoCrossbar = buildFemaleCrossbarGeometry(options)
-
-  const spacing = Math.max(16, d.crossbarWidth * 2 + 10)
-  geoTRod.translate(-spacing / 2, 0, 0)
-  geoCrossbar.translate(spacing / 2, 0, 0)
-
-  const combined = BufferGeometryUtils.mergeGeometries([normalizeGeo(geoTRod), normalizeGeo(geoCrossbar)], false)
-  if (!combined) {
-    throw new Error('Failed to merge combined T-Mount geometries')
-  }
-  combined.computeVertexNormals()
+export function buildOnePartRodGeometry(options: TubeMountSTLOptions): THREE.BufferGeometry {
+  const { rod, cap } = onePartRodSolids(options)
+  if (options.part === 'rod') return solidToGeometry(rod)
+  if (options.part === 'end-cap') return solidToGeometry(cap)
+  // Match the SCAD print-bed layout: rod at the origin, cap at hole_d + 4.
+  const spacing = calculateTubeMountDimensions(options).tubeHoleDia + 4
+  const rodGeometry = solidToGeometry(rod)
+  const capGeometry = solidToGeometry(cap).translate(spacing, 0, 0)
+  const combined = BufferGeometryUtils.mergeGeometries([rodGeometry, capGeometry], false)
+  rodGeometry.dispose()
+  capGeometry.dispose()
+  if (!combined) throw new Error('Failed to merge one-part rod and end cap')
   return combined
 }
 
-/**
- * Resolve the requested tube mount geometry: both parts, Part A (male), Part B (female), T-Rod, or Female Crossbar.
- */
+/** Resolve the selected mount type and printable part. */
 export function buildTubeMountGeometry(options: TubeMountSTLOptions): THREE.BufferGeometry {
-  if (options.mountType === 'tmount') {
-    if (options.part === 'trod') {
-      return buildTRodGeometry(options)
-    }
-    if (options.part === 'crossbar' || options.part === 'splint') {
-      return buildFemaleCrossbarGeometry(options)
-    }
-    return buildTMountCombinedGeometry(options)
-  }
-
-  // Default: threaded mount
-  if (options.part === 'male') {
-    return buildTubeMountPartAGeometry(options)
-  }
-  if (options.part === 'female') {
-    return buildTubeMountPartBGeometry(options)
-  }
+  if (options.mountType === 'one-part') return buildOnePartRodGeometry(options)
+  if (options.part === 'male') return buildTubeMountPartAGeometry(options)
+  if (options.part === 'female') return buildTubeMountPartBGeometry(options)
   return buildTubeMountCombinedGeometry(options)
 }
 
@@ -1179,14 +873,13 @@ export function generateTubeMountSTL(options: TubeMountSTLOptions): Uint8Array {
 export function downloadTubeMountSTL(options: TubeMountSTLOptions): void {
   const bytes = generateTubeMountSTL(options)
   const d = calculateTubeMountDimensions(options)
-  const isTMount = options.mountType === 'tmount'
+  const isOnePart = options.mountType === 'one-part'
   const partName = options.part ?? 'both'
   const tubeStr = options.tubeIndex !== undefined ? `tube${options.tubeIndex + 1}-` : ''
   const odStr = d.tubeOD.toFixed(0)
   const holeStr = d.tubeHoleDia.toFixed(1)
-  const prefix = isTMount ? 'windspiel-t-mount' : 'windspiel-internal-mount'
-  const hStr = isTMount ? `-H${d.crossbarHeight.toFixed(1)}mm` : ''
-  const filename = `${prefix}-${tubeStr}OD${odStr}mm-hole${holeStr}mm${hStr}-${partName}.stl`
+  const prefix = isOnePart ? 'windspiel-one-part-rod' : 'windspiel-internal-mount'
+  const filename = `${prefix}-${tubeStr}OD${odStr}mm-hole${holeStr}mm-${partName}.stl`
 
   triggerFileDownload(bytes, filename)
 }

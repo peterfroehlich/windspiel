@@ -11,6 +11,7 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "@jscad/modeling": "^2.13.0",
     "@react-three/drei": "^9.117.0",
     "@react-three/fiber": "^8.17.10",
     "fflate": "^0.8.3",
